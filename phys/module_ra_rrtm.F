@@ -1747,7 +1747,7 @@ CONTAINS
 !ccc
    USE MODULE_RA_CLWRF_SUPPORT, ONLY :  read_CAMgases
 !ccc
-   
+   USE module_esm_dump
    IMPLICIT NONE
 !------------------------------------------------------------------
    LOGICAL, INTENT(IN )      ::        warm_rain
@@ -1833,6 +1833,8 @@ CONTAINS
 
 ! p_top for vertical nesting
     REAL, INTENT(IN   ) :: p_top
+    LOGICAL :: esm_dumping
+    REAL, DIMENSION( its:ite, kts:kte ) :: esm_tten, esm_ttenc
 
 !------------------------------------------------------------------
 
@@ -1875,6 +1877,37 @@ CONTAINS
 !-----CALCULATE LONG WAVE RADIATION
 !                                                              
    j_loop: DO J=jts,jte
+   ! EarthSciML instrumentation (module_esm_dump): one dump per j-row.  Tile
+   ! arrays in WRF order (k=1 bottom); the RRTM column arrays (k=1 top, P in
+   ! hPa) and RRTM's internal fluxes are appended for column i=its.
+   esm_dumping = esm_dump_want('rrtm')
+   IF(esm_dumping) THEN
+      CALL esm_dump_open('rrtm')
+      CALL esm_dump_var('j', j); CALL esm_dump_var('its', its); CALL esm_dump_var('ite', ite)
+      CALL esm_dump_var('kts', kts); CALL esm_dump_var('kte', kte); CALL esm_dump_var('kms', kms); CALL esm_dump_var('kme', kme)
+      CALL esm_dump_var('p_top', p_top); CALL esm_dump_var('r', r); CALL esm_dump_var('g', g)
+      CALL esm_dump_var('icloud', icloud); CALL esm_dump_var('warm_rain', warm_rain)
+      CALL esm_dump_var('yr', yr); CALL esm_dump_var('julian', julian); CALL esm_dump_var('ghg_input', ghg_input)
+      CALL esm_dump_var('co2vmr', co2vmr); CALL esm_dump_var('n2ovmr', n2ovmr); CALL esm_dump_var('ch4vmr', ch4vmr)
+      CALL esm_dump_var('emiss', emiss(its:ite,j)); CALL esm_dump_var('tsk', tsk(its:ite,j))
+      CALL esm_dump_var('t3d', t3d(its:ite,kts:kte,j)); CALL esm_dump_var('p3d', p3d(its:ite,kts:kte,j))
+      CALL esm_dump_var('pi3d', pi3d(its:ite,kts:kte,j)); CALL esm_dump_var('rho3d', rho3d(its:ite,kts:kte,j))
+      CALL esm_dump_var('dz8w', dz8w(its:ite,kts:kte,j))
+      CALL esm_dump_var('p8w', p8w(its:ite,kts:kte+1,j)); CALL esm_dump_var('t8w', t8w(its:ite,kts:kte+1,j))
+      IF(PRESENT(cldfra3d)) CALL esm_dump_var('cldfra3d', cldfra3d(its:ite,kts:kte,j))
+      IF(PRESENT(qv3d)) CALL esm_dump_var('qv3d', qv3d(its:ite,kts:kte,j))
+      IF(PRESENT(qc3d)) CALL esm_dump_var('qc3d', qc3d(its:ite,kts:kte,j))
+      IF(PRESENT(qr3d)) CALL esm_dump_var('qr3d', qr3d(its:ite,kts:kte,j))
+      IF(PRESENT(qi3d)) CALL esm_dump_var('qi3d', qi3d(its:ite,kts:kte,j))
+      IF(PRESENT(qs3d)) CALL esm_dump_var('qs3d', qs3d(its:ite,kts:kte,j))
+      IF(PRESENT(qg3d)) CALL esm_dump_var('qg3d', qg3d(its:ite,kts:kte,j))
+      IF(PRESENT(f_qv)) CALL esm_dump_var('f_qv', f_qv)
+      IF(PRESENT(f_qc)) CALL esm_dump_var('f_qc', f_qc)
+      IF(PRESENT(f_qr)) CALL esm_dump_var('f_qr', f_qr)
+      IF(PRESENT(f_qi)) CALL esm_dump_var('f_qi', f_qi)
+      IF(PRESENT(f_qs)) CALL esm_dump_var('f_qs', f_qs)
+      IF(PRESENT(f_qg)) CALL esm_dump_var('f_qg', f_qg)
+   ENDIF
    i_loop: DO I=its,ite
 
 ! reverse vars 
@@ -1993,6 +2026,14 @@ CONTAINS
          GLW0=0. 
          OLR0=0. 
          TSFC=TSK(I,J)
+         esm_dump_inner = (esm_dumping .OR. esm_dump_active()) .AND. I == its
+         IF(esm_dump_inner) THEN
+            CALL esm_dump_var('pw1d', pw1d); CALL esm_dump_var('tw1d', tw1d)
+            CALL esm_dump_var('t1d', t1d); CALL esm_dump_var('p1d', p1d); CALL esm_dump_var('dz1d', dz1d)
+            CALL esm_dump_var('qv1d', qv1d); CALL esm_dump_var('qc1d', qc1d); CALL esm_dump_var('qr1d', qr1d)
+            CALL esm_dump_var('qi1d', qi1d); CALL esm_dump_var('qs1d', qs1d); CALL esm_dump_var('qg1d', qg1d)
+            CALL esm_dump_var('cldfra1d', cldfra1d); CALL esm_dump_var('emiss0', emiss0); CALL esm_dump_var('tsfc', tsfc)
+         ENDIF
 
          CALL RRTM(tten1d,tten1dc,glw0,olr0,tsfc,cldfra1d,         &
                    t1d,tw1d,qv1d,qc1d,                             &
@@ -2003,16 +2044,25 @@ CONTAINS
 !ccc
                    kts,kte                                         )
  
+         esm_dump_inner = .FALSE.
          GLW(I,J)=GLW0
-         OLR(I,J)=OLR0 
- 
+         OLR(I,J)=OLR0
+
          DO K=kts,kte
             nk=kme-1-k+kms
             rthraten(i,k,j)=rthraten(i,k,j)+tten1d(nk)/pi3d(i,k,j)
             rthratenc(i,k,j)=rthratenc(i,k,j)+tten1dc(nk)/pi3d(i,k,j)
+            IF(esm_dumping) THEN
+               esm_tten(i,k)=tten1d(nk)/pi3d(i,k,j); esm_ttenc(i,k)=tten1dc(nk)/pi3d(i,k,j)
+            ENDIF
          ENDDO
 
       END DO i_loop
+      IF(esm_dumping) THEN
+         CALL esm_dump_var('glw', glw(its:ite,j)); CALL esm_dump_var('olr', olr(its:ite,j))
+         CALL esm_dump_var('rthraten_lw', esm_tten); CALL esm_dump_var('rthratenc_lw', esm_ttenc)
+         CALL esm_dump_close()
+      ENDIF
    END DO j_loop                                           
 
 !-------------------------------------------------------------------
@@ -2072,8 +2122,9 @@ CONTAINS
 !        the radiative transfer algorithm                                        
 !     c) calls RTRN (for both clear and cloudy columns) to do the                
 !        radiative transfer calculation                                          
-!     d) passes the necessary flux and cooling rate back to MM5                  
+!     d) passes the necessary flux and cooling rate back to MM5
 !---------------------------------------------------------------------
+      USE module_esm_dump
       IMPLICIT NONE
 !---------------------------------------------------------------------
 
@@ -2294,6 +2345,24 @@ CONTAINS
            GLW = TOTDFLUX(0)
 !           OLR = TOTUFLUX(NLAYERS)
            OLR = TOTUFLUX(kte)
+      ! EarthSciML instrumentation: RRTM column internals.  Layer arrays run
+      ! kts:NLAYERS (k=1 = lowest layer of the RRTM column, NLAYERS >= kte
+      ! includes the extra layers above the model top); level arrays run
+      ! 0:NLAYERS (first entry = surface).  Fluxes in W m-2, HTR in K/day.
+      IF(esm_dump_inner) THEN
+         CALL esm_dump_var('nlayers', nlayers); CALL esm_dump_var('tbound', tbound)
+         CALL esm_dump_var('semiss', semiss); CALL esm_dump_var('o3prof', o3prof)
+         CALL esm_dump_var('pavel', pavel); CALL esm_dump_var('tavel', tavel)
+         CALL esm_dump_var('pz', pz); CALL esm_dump_var('tz', tz)
+         CALL esm_dump_var('cldfrac', cldfrac); CALL esm_dump_var('taucloud', taucloud)
+         CALL esm_dump_var('coldry', coldry); CALL esm_dump_var('colh2o', colh2o); CALL esm_dump_var('colco2', colco2)
+         CALL esm_dump_var('colo3', colo3); CALL esm_dump_var('coln2o', coln2o); CALL esm_dump_var('colch4', colch4)
+         CALL esm_dump_var('colo2', colo2)
+         CALL esm_dump_var('totuflux', totuflux); CALL esm_dump_var('totdflux', totdflux)
+         CALL esm_dump_var('htr', htr); CALL esm_dump_var('htrc', htrc)
+         CALL esm_dump_var('tten_col', tten); CALL esm_dump_var('ttenc_col', ttenc)
+         CALL esm_dump_var('glw_col', glw); CALL esm_dump_var('olr_col', olr)
+      ENDIF
 
    END SUBROUTINE RRTM
 

@@ -26,6 +26,7 @@ CONTAINS
                    ims,ime, jms,jme, kms,kme,                   &
                    its,ite, jts,jte, kts,kte                    )
 !----------------------------------------------------------------
+    USE module_esm_dump
     IMPLICIT NONE
 !----------------------------------------------------------------
 !                                                                        
@@ -159,6 +160,7 @@ CONTAINS
                                                            P1D, &
                                                            T1D
    INTEGER ::  I,J
+   LOGICAL ::  esm_dumping
 
    DO J=jts,jte
 
@@ -173,6 +175,33 @@ CONTAINS
 ! because of the way PSFC is defined in SLAB1D. Whether *that*
 ! is a good idea or not, this commenter cannot comment. JM
 
+      ! EarthSciML instrumentation (module_esm_dump): inputs before the call,
+      ! outputs after (<name>_out); SLAB1D appends its diagnostics (esm_dump_inner).
+      esm_dumping = esm_dump_want('slab')
+      IF(esm_dumping) THEN
+         CALL esm_dump_open('slab')
+         CALL esm_dump_var('j', j); CALL esm_dump_var('its', its); CALL esm_dump_var('ite', ite)
+         CALL esm_dump_var('kts', kts); CALL esm_dump_var('kte', kte)
+         CALL esm_dump_var('num_soil_layers', num_soil_layers); CALL esm_dump_var('radiation', radiation)
+         CALL esm_dump_var('ifsnow', ifsnow); CALL esm_dump_var('deltsm', deltsm); CALL esm_dump_var('rovcp', rovcp)
+         CALL esm_dump_var('xlv', xlv); CALL esm_dump_var('dtmin', dtmin)
+         CALL esm_dump_var('svp1', svp1); CALL esm_dump_var('svp2', svp2); CALL esm_dump_var('svp3', svp3)
+         CALL esm_dump_var('svpt0', svpt0); CALL esm_dump_var('ep2', ep2); CALL esm_dump_var('karman', karman)
+         CALL esm_dump_var('eomeg', eomeg); CALL esm_dump_var('stbolt', stbolt); CALL esm_dump_var('p1000mb', p1000mb)
+         CALL esm_dump_var('zs', zs); CALL esm_dump_var('dzs', dzs)
+         CALL esm_dump_var('t1d', t1d); CALL esm_dump_var('qv1d', qv1d); CALL esm_dump_var('p1d', p1d)
+         CALL esm_dump_var('flhc', flhc(its:ite,j)); CALL esm_dump_var('flqc', flqc(its:ite,j))
+         CALL esm_dump_var('psfc', psfc(its:ite,j)); CALL esm_dump_var('xland', xland(its:ite,j))
+         CALL esm_dump_var('tmn', tmn(its:ite,j)); CALL esm_dump_var('hfx', hfx(its:ite,j))
+         CALL esm_dump_var('qfx', qfx(its:ite,j)); CALL esm_dump_var('lh', lh(its:ite,j))
+         CALL esm_dump_var('tsk', tsk(its:ite,j)); CALL esm_dump_var('qsfc', qsfc(its:ite,j))
+         CALL esm_dump_var('chklowq', chklowq(its:ite,j)); CALL esm_dump_var('gsw', gsw(its:ite,j))
+         CALL esm_dump_var('glw', glw(its:ite,j)); CALL esm_dump_var('capg', capg(its:ite,j))
+         CALL esm_dump_var('thc', thc(its:ite,j)); CALL esm_dump_var('snowc', snowc(its:ite,j))
+         CALL esm_dump_var('emiss', emiss(its:ite,j)); CALL esm_dump_var('mavail', mavail(its:ite,j))
+         CALL esm_dump_var('tslb', tslb(its:ite,1:num_soil_layers,j))
+         esm_dump_inner = .TRUE.
+      ENDIF
       CALL SLAB1D(J,T1D,QV1D,P1D,FLHC(ims,j),FLQC(ims,j),       &
            PSFC(its,j),XLAND(ims,j),TMN(ims,j),HFX(ims,j),      &
            QFX(ims,j),TSK(ims,j),QSFC(ims,j),CHKLOWQ(ims,j),    &
@@ -185,7 +214,16 @@ CONTAINS
            ids,ide, jds,jde, kds,kde,                           &
            ims,ime, jms,jme, kms,kme,                           &
            its,ite, jts,jte, kts,kte                            )
-
+      IF(esm_dumping) THEN
+         esm_dump_inner = .FALSE.
+         CALL esm_dump_var('hfx_out', hfx(its:ite,j)); CALL esm_dump_var('qfx_out', qfx(its:ite,j))
+         CALL esm_dump_var('lh_out', lh(its:ite,j)); CALL esm_dump_var('tsk_out', tsk(its:ite,j))
+         CALL esm_dump_var('qsfc_out', qsfc(its:ite,j)); CALL esm_dump_var('chklowq_out', chklowq(its:ite,j))
+         CALL esm_dump_var('capg_out', capg(its:ite,j)); CALL esm_dump_var('flhc_out', flhc(its:ite,j))
+         CALL esm_dump_var('flqc_out', flqc(its:ite,j))
+         CALL esm_dump_var('tslb_out', tslb(its:ite,1:num_soil_layers,j))
+         CALL esm_dump_close()
+      ENDIF
    ENDDO
 
    END SUBROUTINE SLAB
@@ -203,6 +241,7 @@ CONTAINS
                    ims,ime, jms,jme, kms,kme,                   &
                    its,ite, jts,jte, kts,kte                    )
 !----------------------------------------------------------------
+    USE module_esm_dump
     IMPLICIT NONE
 !----------------------------------------------------------------
 !                                                                        
@@ -311,6 +350,7 @@ CONTAINS
    DATA CSW/4.183E6/
    DATA LAMG/1.407E-8, -1.455E-5, 6.290E-3, 0.16857/
 
+   NSOIL=1
    DO i=its,ite
 ! in cmb
       PSFC(I)=PSFCPA(I)/1000.
@@ -483,6 +523,16 @@ CONTAINS
 !-----MODIFY THE THE GROUND TEMPERATURE IF THE SNOW COVER EFFECTS ARE            
 !     CONSIDERED: LIMIT THE GROUND TEMPERATURE UNDER 0 C.                        
 !                                                                                
+      ! EarthSciML instrumentation: land-path diagnostics of this call
+      ! (reached only when at least one point of the row is land).
+      IF(esm_dump_inner) THEN
+         CALL esm_dump_var('nsoil', nsoil); CALL esm_dump_var('radswtch', radswtch)
+         CALL esm_dump_var('thx', thx); CALL esm_dump_var('qx', qx); CALL esm_dump_var('tg0', tg0)
+         CALL esm_dump_var('oltg', oltg); CALL esm_dump_var('upflux', upflux); CALL esm_dump_var('xinet', xinet)
+         CALL esm_dump_var('rnet', rnet); CALL esm_dump_var('hm', hm); CALL esm_dump_var('qs_sfc', qs)
+         CALL esm_dump_var('dthgdt', dthgdt); CALL esm_dump_var('flux_soil', flux(its:ite,1:num_soil_layers))
+         CALL esm_dump_var('xld1', xld1)
+      ENDIF
       IF(IFSNOW.EQ.0)GOTO 90                                              
       DO 85 I=its,ite
         IF(XLD1(I).LT.0.5)GOTO 85                                                

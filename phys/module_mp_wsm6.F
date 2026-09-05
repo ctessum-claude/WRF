@@ -3,6 +3,7 @@
 
  use mp_wsm6,only: mp_wsm6_run,refl10cm_wsm6
  use mp_wsm6_effectrad,only: mp_wsm6_effectRad_run
+ use module_esm_dump
 
 
  implicit none
@@ -107,6 +108,7 @@
  real(kind=kind_phys),dimension(its:ite,kts:kte):: t_hv,den_hv,p_hv,delz_hv
  real(kind=kind_phys),dimension(its:ite,kts:kte):: qv_hv,qc_hv,qi_hv,qr_hv,qs_hv,qg_hv
  real(kind=kind_phys),dimension(its:ite,kts:kte):: re_qc_hv,re_qi_hv,re_qs_hv
+ logical:: esm_dumping
 
 !-----------------------------------------------------------------------------------------------------------------
 
@@ -145,6 +147,32 @@
        enddo
     endif
 
+!--- EarthSciML instrumentation (module_esm_dump): kernel inputs before the
+!    call, outputs after (<name>_out); esm_dump_inner lets mp_wsm6_run (built
+!    with -DESM_DUMP) append its process rates to the same file.
+    esm_dumping = esm_dump_want('wsm6')
+    if(esm_dumping) then
+       call esm_dump_open('wsm6')
+       call esm_dump_var('j', j); call esm_dump_var('its', its); call esm_dump_var('ite', ite)
+       call esm_dump_var('kts', kts); call esm_dump_var('kte', kte)
+       call esm_dump_var('delt', delt); call esm_dump_var('g', g); call esm_dump_var('cpd', cpd)
+       call esm_dump_var('cpv', cpv); call esm_dump_var('rd', rd); call esm_dump_var('rv', rv)
+       call esm_dump_var('t0c', t0c); call esm_dump_var('ep1', ep1); call esm_dump_var('ep2', ep2)
+       call esm_dump_var('qmin', qmin); call esm_dump_var('xls', xls); call esm_dump_var('xlv0', xlv0)
+       call esm_dump_var('xlf0', xlf0); call esm_dump_var('den0', den0); call esm_dump_var('denr', denr)
+       call esm_dump_var('cliq', cliq); call esm_dump_var('cice', cice); call esm_dump_var('psat', psat)
+       call esm_dump_var('has_snow', present(snow) .and. present(snowncv))
+       call esm_dump_var('has_graupel', present(graupel) .and. present(graupelncv))
+       call esm_dump_var('t', t_hv); call esm_dump_var('q', qv_hv); call esm_dump_var('qc', qc_hv)
+       call esm_dump_var('qi', qi_hv); call esm_dump_var('qr', qr_hv); call esm_dump_var('qs', qs_hv)
+       call esm_dump_var('qg', qg_hv); call esm_dump_var('den', den_hv); call esm_dump_var('p', p_hv)
+       call esm_dump_var('delz', delz_hv); call esm_dump_var('pii', pii(its:ite,kts:kte,j))
+       call esm_dump_var('rain', rain_hv)
+       if(present(snow) .and. present(snowncv)) call esm_dump_var('snow', snow_hv)
+       if(present(graupel) .and. present(graupelncv)) call esm_dump_var('graupel', graupel_hv)
+       esm_dump_inner = .true.
+    endif
+
 !--- call to cloud microphysics scheme:
     call mp_wsm6_run(t=t_hv,q=qv_hv,qc=qc_hv,qi=qi_hv,qr=qr_hv,qs=qs_hv,qg=qg_hv, &
                  den=den_hv,p=p_hv,delz=delz_hv,delt=delt,g=g,cpd=cpd,cpv=cpv,    &
@@ -157,6 +185,21 @@
                  ,rainprod2d=rainprod_hv,evapprod2d=evapprod_hv                   &
 #endif
                     )
+    if(esm_dumping) then
+       esm_dump_inner = .false.
+       call esm_dump_var('t_out', t_hv); call esm_dump_var('q_out', qv_hv); call esm_dump_var('qc_out', qc_hv)
+       call esm_dump_var('qi_out', qi_hv); call esm_dump_var('qr_out', qr_hv); call esm_dump_var('qs_out', qs_hv)
+       call esm_dump_var('qg_out', qg_hv); call esm_dump_var('rain_out', rain_hv)
+       call esm_dump_var('rainncv', rainncv_hv); call esm_dump_var('sr', sr_hv)
+       if(present(snow) .and. present(snowncv)) then
+          call esm_dump_var('snow_out', snow_hv); call esm_dump_var('snowncv', snowncv_hv)
+       endif
+       if(present(graupel) .and. present(graupelncv)) then
+          call esm_dump_var('graupel_out', graupel_hv); call esm_dump_var('graupelncv', graupelncv_hv)
+       endif
+       call esm_dump_var('errflg', errflg)
+       call esm_dump_close()
+    endif
 
     do i = its,ite
        !inout arguments:

@@ -2,6 +2,7 @@
  module module_sf_sfclayrev
  use ccpp_kind_types,only: kind_phys
  use sf_sfclayrev,only: sf_sfclayrev_run
+ use module_esm_dump
 
 
  implicit none
@@ -139,6 +140,8 @@
     chs2_hv,cqs2_hv,chs_hv,flhc_hv,flqc_hv,qgh_hv
  real(kind=kind_phys),dimension(its:ite):: &
     ustm_hv
+ logical:: esm_dumping
+ integer:: esm_isftcflx,esm_iz0tlnd
 
 !-----------------------------------------------------------------------------------------------------------------
 
@@ -208,6 +211,42 @@
                                     dz1d=dz1d,u1d=u1d,v1d=v1d,qv1d=qv1d,p1d=p1d,t1d=t1d,           &
                                     its=its,ite=ite,kts=kts,kte=kte,errmsg=errmsg,errflg=errflg)
 
+    ! EarthSciML instrumentation (module_esm_dump): every kernel input before
+    ! the call, every output after it; inout arguments appear twice (<name>
+    ! before, <name>_out after).  isftcflx/iz0tlnd are -1 when not present.
+    esm_dumping = esm_dump_want('sfclayrev')
+    if(esm_dumping) then
+       call esm_dump_open('sfclayrev')
+       call esm_dump_var('j', j); call esm_dump_var('its', its); call esm_dump_var('ite', ite)
+       call esm_dump_var('kts', kts); call esm_dump_var('kte', kte)
+       call esm_dump_var('cp', cp); call esm_dump_var('g', g); call esm_dump_var('rovcp', rovcp)
+       call esm_dump_var('r', r); call esm_dump_var('xlv', xlv)
+       call esm_dump_var('svp1', svp1); call esm_dump_var('svp2', svp2); call esm_dump_var('svp3', svp3)
+       call esm_dump_var('svpt0', svpt0); call esm_dump_var('ep1', ep1); call esm_dump_var('ep2', ep2)
+       call esm_dump_var('karman', karman); call esm_dump_var('p1000mb', p1000mb)
+       call esm_dump_var('tofd_factor', tofd_factor); call esm_dump_var('if_kim_tofd', kim_tofd)
+       call esm_dump_var('isfflx', l_isfflx); call esm_dump_var('shalwater_z0', l_shalwater_z0)
+       call esm_dump_var('scm_force_flux', l_scm_force_flux)
+       esm_isftcflx = -1; esm_iz0tlnd = -1
+       if(present(isftcflx)) esm_isftcflx = isftcflx
+       if(present(iz0tlnd)) esm_iz0tlnd = iz0tlnd
+       call esm_dump_var('isftcflx', esm_isftcflx); call esm_dump_var('iz0tlnd', esm_iz0tlnd)
+       call esm_dump_var('ux', u1d); call esm_dump_var('vx', v1d); call esm_dump_var('t1d', t1d)
+       call esm_dump_var('qv1d', qv1d); call esm_dump_var('p1d', p1d); call esm_dump_var('dz8w1d', dz1d)
+       call esm_dump_var('psfcpa', psfc_hv); call esm_dump_var('mavail', mavail_hv)
+       call esm_dump_var('pblh', pblh_hv); call esm_dump_var('tsk', tsk_hv); call esm_dump_var('xland', xland_hv)
+       call esm_dump_var('lakemask', lakemask_hv); call esm_dump_var('water_depth', water_depth_hv)
+       call esm_dump_var('dx', dx_hv); call esm_dump_var('varf', var2d_hv)
+       call esm_dump_var('chs', chs_hv); call esm_dump_var('chs2', chs2_hv); call esm_dump_var('cqs2', cqs2_hv)
+       call esm_dump_var('cpm', cpm_hv); call esm_dump_var('rmol', rmol_hv); call esm_dump_var('znt', znt_hv)
+       call esm_dump_var('ust', ust_hv); call esm_dump_var('zol', zol_hv); call esm_dump_var('mol', mol_hv)
+       call esm_dump_var('regime', regime_hv); call esm_dump_var('psim', psim_hv); call esm_dump_var('psih', psih_hv)
+       call esm_dump_var('fm', fm_hv); call esm_dump_var('fh', fh_hv); call esm_dump_var('hfx', hfx_hv)
+       call esm_dump_var('qfx', qfx_hv); call esm_dump_var('qsfc', qsfc_hv); call esm_dump_var('gz1oz0', gz1oz0_hv)
+       call esm_dump_var('wspd', wspd_hv); call esm_dump_var('br', br_hv); call esm_dump_var('flhc', flhc_hv)
+       call esm_dump_var('flqc', flqc_hv); call esm_dump_var('qgh', qgh_hv); call esm_dump_var('ustm', ustm_hv)
+    endif
+
     call sf_sfclayrev_run(ux=u1d,vx=v1d,t1d=t1d,qv1d=qv1d,p1d=p1d,dz8w1d=dz1d,                     &
                           cp=cp,g=g,rovcp=rovcp,r=r,xlv=xlv,psfcpa=psfc_hv,chs=chs_hv,             &
                           chs2=chs2_hv,cqs2=cqs2_hv,cpm=cpm_hv,pblh=pblh_hv,                       &
@@ -227,6 +266,21 @@
                           ustm=ustm_hv,ck=ck_hv,cka=cka_hv,cd=cd_hv,cda=cda_hv                     &
 #endif
                          )
+    if(esm_dumping) then
+       call esm_dump_var('chs_out', chs_hv); call esm_dump_var('chs2_out', chs2_hv); call esm_dump_var('cqs2_out', cqs2_hv)
+       call esm_dump_var('cpm_out', cpm_hv); call esm_dump_var('rmol_out', rmol_hv); call esm_dump_var('znt_out', znt_hv)
+       call esm_dump_var('ust_out', ust_hv); call esm_dump_var('zol_out', zol_hv); call esm_dump_var('mol_out', mol_hv)
+       call esm_dump_var('regime_out', regime_hv); call esm_dump_var('psim_out', psim_hv); call esm_dump_var('psih_out', psih_hv)
+       call esm_dump_var('fm_out', fm_hv); call esm_dump_var('fh_out', fh_hv); call esm_dump_var('hfx_out', hfx_hv)
+       call esm_dump_var('qfx_out', qfx_hv); call esm_dump_var('qsfc_out', qsfc_hv); call esm_dump_var('gz1oz0_out', gz1oz0_hv)
+       call esm_dump_var('wspd_out', wspd_hv); call esm_dump_var('br_out', br_hv); call esm_dump_var('flhc_out', flhc_hv)
+       call esm_dump_var('flqc_out', flqc_hv); call esm_dump_var('qgh_out', qgh_hv); call esm_dump_var('ustm_out', ustm_hv)
+       call esm_dump_var('lh', lh_hv); call esm_dump_var('u10', u10_hv); call esm_dump_var('v10', v10_hv)
+       call esm_dump_var('th2', th2_hv); call esm_dump_var('t2', t2_hv); call esm_dump_var('q2', q2_hv)
+       call esm_dump_var('ck', ck_hv); call esm_dump_var('cka', cka_hv); call esm_dump_var('cd', cd_hv)
+       call esm_dump_var('cda', cda_hv); call esm_dump_var('errflg', errflg)
+       call esm_dump_close()
+    endif
 
     do i = its,ite
        !output arguments:

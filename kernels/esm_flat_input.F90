@@ -1,10 +1,21 @@
 ! esm_flat_input: reader for the flat text produced by EqWeFiC tools/esm_dump.py --flat.
 ! Records: "<name> <kind> <rank> <extents...>" then one line of values (Fortran order).
 module esm_flat_input
-  use, intrinsic :: iso_fortran_env, only: real64
+  use, intrinsic :: iso_fortran_env, only: real32, real64
   implicit none
   private
   public :: flat_read, flat_r0, flat_r1, flat_r2, flat_r3, flat_i0, flat_i1, flat_l0, flat_has
+
+  ! flat_r1/r2/r3 accept real32 or real64 arrays (real32 drivers, PREC=)
+  interface flat_r1
+    module procedure flat_r1_8, flat_r1_4
+  end interface
+  interface flat_r2
+    module procedure flat_r2_8, flat_r2_4
+  end interface
+  interface flat_r3
+    module procedure flat_r3_8, flat_r3_4
+  end interface
 
   type :: rec_t
     character(len=64) :: name = ''
@@ -74,21 +85,36 @@ contains
     character(len=*), intent(in) :: name
     flat_r0 = recs(find(name))%r(1)
   end function flat_r0
-  subroutine flat_r1(name, a)
+  subroutine flat_r1_8(name, a)
     character(len=*), intent(in) :: name
     real(real64), intent(out) :: a(:)
-    a = recs(find(name))%r(1:size(a))
-  end subroutine flat_r1
-  subroutine flat_r2(name, a)
+    a = real(recs(find(name))%r(1:size(a)), real64)
+  end subroutine flat_r1_8
+  subroutine flat_r2_8(name, a)
     character(len=*), intent(in) :: name
     real(real64), intent(out) :: a(:,:)
-    a = reshape(recs(find(name))%r(1:size(a)), shape(a))
-  end subroutine flat_r2
-  subroutine flat_r3(name, a)
+    a = real(reshape(recs(find(name))%r(1:size(a)), shape(a)), real64)
+  end subroutine flat_r2_8
+  subroutine flat_r3_8(name, a)
     character(len=*), intent(in) :: name
     real(real64), intent(out) :: a(:,:,:)
-    a = reshape(recs(find(name))%r(1:size(a)), shape(a))
-  end subroutine flat_r3
+    a = real(reshape(recs(find(name))%r(1:size(a)), shape(a)), real64)
+  end subroutine flat_r3_8
+  subroutine flat_r1_4(name, a)
+    character(len=*), intent(in) :: name
+    real(real32), intent(out) :: a(:)
+    a = real(recs(find(name))%r(1:size(a)), real32)
+  end subroutine flat_r1_4
+  subroutine flat_r2_4(name, a)
+    character(len=*), intent(in) :: name
+    real(real32), intent(out) :: a(:,:)
+    a = real(reshape(recs(find(name))%r(1:size(a)), shape(a)), real32)
+  end subroutine flat_r2_4
+  subroutine flat_r3_4(name, a)
+    character(len=*), intent(in) :: name
+    real(real32), intent(out) :: a(:,:,:)
+    a = real(reshape(recs(find(name))%r(1:size(a)), shape(a)), real32)
+  end subroutine flat_r3_4
   integer function flat_i0(name)
     character(len=*), intent(in) :: name
     flat_i0 = recs(find(name))%i(1)

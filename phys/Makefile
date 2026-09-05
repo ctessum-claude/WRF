@@ -517,3 +517,7 @@ clean:
 # DO NOT DELETE
 
 include ../main/depend.common
+
+# EarthSciML instrumentation: build the WSM6 kernel with its guarded
+# sub-process dumps enabled (see module_esm_dump.F).
+physics_mmm/mp_wsm6.o : CPPFLAGS += -DESM_DUMP

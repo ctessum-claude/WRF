@@ -948,6 +948,7 @@ module_ra_gfdleta.o: \
 
 
 module_ra_rrtm.o: \
+	module_esm_dump.o \
 	../frame/module_wrf_error.o \
 	module_ra_clWRF_support.o \
 	../frame/module_dm.o 
@@ -2323,6 +2324,7 @@ module_sf_pxlsm.o: \
 
 
 module_sf_sfclayrev.o: \
+	module_esm_dump.o \
 	ccpp_kind_types.o \
 	physics_mmm/sf_sfclayrev.o
 
@@ -2946,6 +2948,7 @@ module_mp_wdm5.o: \
 
 
 module_mp_wsm6.o: \
+	module_esm_dump.o \
 	ccpp_kind_types.o \
 	physics_mmm/mp_wsm6_effectRad.o \
 	physics_mmm/mp_radar.o \
@@ -3021,6 +3024,7 @@ physics_mmm/cu_ntiedtke.o: \
 
 
 physics_mmm/mp_wsm6.o: \
+	module_esm_dump.o \
 	ccpp_kind_types.o \
 	physics_mmm/mp_radar.o \
 	physics_mmm/module_libmassv.o
@@ -4367,3 +4371,9 @@ start_em.o : \
 	../frame/module_tiles.o \
 	../share/module_trajectory.o \
 	../frame/module_wrf_error.o
+
+module_ra_sw.o: \
+	module_esm_dump.o
+
+module_sf_slab.o: \
+	module_esm_dump.o

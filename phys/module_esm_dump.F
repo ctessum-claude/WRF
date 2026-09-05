@@ -12,6 +12,13 @@
 !   if (dumping) call esm_dump_var('ttnp', rthblten_hv)
 !   if (dumping) call esm_dump_close()
 !
+! Sub-process diagnostics inside a kernel (guarded so the kernel stays clean
+! when built without the dump module, e.g. #ifdef ESM_DUMP in physics_mmm):
+!   if (esm_dump_inner) call esm_dump_var('praut_raw', praut)
+! The wrapper sets esm_dump_inner = dumping (or dumping .and. i == its for
+! per-column kernels) around the call; esm_dump_active() tells whether a
+! dump file is currently open.
+!
 ! Control (environment variables):
 !   ESM_DUMP       comma-separated scheme names to dump, or "all" (unset = off)
 !   ESM_DUMP_CALLS comma-separated 1-based call indices per scheme to dump
@@ -28,6 +35,13 @@ module module_esm_dump
   implicit none
   private
   public :: esm_dump_want, esm_dump_open, esm_dump_open_file, esm_dump_close, esm_dump_var
+  public :: esm_dump_active, esm_dump_inner
+
+  ! esm_dump_inner: set by a wrapper (or driver) to let dump calls placed
+  ! INSIDE a kernel (sub-process diagnostics) append to the open file.  The
+  ! wrapper sets it .true. only for the call/column it wants, so kernels that
+  ! are called once per column do not write duplicate keys.
+  logical, save :: esm_dump_inner = .false.
 
   integer, parameter :: max_schemes = 32
   character(len=32) :: scheme_names(max_schemes) = ''
@@ -120,7 +134,12 @@ contains
     write(unit, '(A)') '}}'
     close(unit)
     unit = -1
+    esm_dump_inner = .false.
   end subroutine esm_dump_close
+
+  logical function esm_dump_active() result(active)
+    active = unit /= -1
+  end function esm_dump_active
 
   subroutine header(name, kind, shape)
     character(len=*), intent(in) :: name, kind

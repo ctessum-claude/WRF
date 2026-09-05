@@ -21,6 +21,7 @@ CONTAINS
                     coszen,julian,                                & ! jararias, 14/08/2013
                     obscur)					    ! amontornes-bcodina 2015/09 solar eclipses
 !------------------------------------------------------------------
+   USE module_esm_dump
    IMPLICIT NONE
 !------------------------------------------------------------------
    INTEGER,    INTENT(IN   ) ::        ids,ide, jds,jde, kds,kde, &
@@ -108,10 +109,45 @@ CONTAINS
 ! amontornes-bcodina 2015/09 solar eclipses
 !  obscur0 --> degree of obscuration for solar eclipses prediction at one point
    REAL::    obscur0
+   LOGICAL :: esm_dumping
+   REAL, DIMENSION( its:ite, kts:kte ) :: esm_tten
 
 !------------------------------------------------------------------
 
    j_loop: DO J=jts,jte
+   ! EarthSciML instrumentation (module_esm_dump): one dump per j-row (= one
+   ! call).  Tile arrays are in WRF order (k=1 bottom); SWPARA's own arrays
+   ! (k=1 top) are appended for column i=its via esm_dump_inner.
+   esm_dumping = esm_dump_want('sw')
+   IF(esm_dumping) THEN
+      CALL esm_dump_open('sw')
+      CALL esm_dump_var('j', j); CALL esm_dump_var('its', its); CALL esm_dump_var('ite', ite)
+      CALL esm_dump_var('kts', kts); CALL esm_dump_var('kte', kte); CALL esm_dump_var('kms', kms); CALL esm_dump_var('kme', kme)
+      CALL esm_dump_var('dt', dt); CALL esm_dump_var('gmt', gmt); CALL esm_dump_var('r', r); CALL esm_dump_var('cp', cp)
+      CALL esm_dump_var('g', g); CALL esm_dump_var('julday', julday); CALL esm_dump_var('ghg_input', ghg_input)
+      CALL esm_dump_var('xtime', xtime); CALL esm_dump_var('declin', declin); CALL esm_dump_var('solcon', solcon)
+      CALL esm_dump_var('radfrq', radfrq); CALL esm_dump_var('icloud', icloud); CALL esm_dump_var('degrad', degrad)
+      CALL esm_dump_var('warm_rain', warm_rain); CALL esm_dump_var('cssca', cssca)
+      IF(PRESENT(julian)) CALL esm_dump_var('julian', julian)
+      CALL esm_dump_var('xlat', xlat(its:ite,j)); CALL esm_dump_var('xlong', xlong(its:ite,j))
+      CALL esm_dump_var('albedo', albedo(its:ite,j)); CALL esm_dump_var('coszen', coszen(its:ite,j))
+      CALL esm_dump_var('obscur', obscur(its:ite,j))
+      CALL esm_dump_var('t3d', t3d(its:ite,kts:kte,j)); CALL esm_dump_var('p3d', p3d(its:ite,kts:kte,j))
+      CALL esm_dump_var('pi3d', pi3d(its:ite,kts:kte,j)); CALL esm_dump_var('rho_phy', rho_phy(its:ite,kts:kte,j))
+      CALL esm_dump_var('dz8w', dz8w(its:ite,kts:kte,j))
+      IF(PRESENT(qv3d)) CALL esm_dump_var('qv3d', qv3d(its:ite,kts:kte,j))
+      IF(PRESENT(qc3d)) CALL esm_dump_var('qc3d', qc3d(its:ite,kts:kte,j))
+      IF(PRESENT(qr3d)) CALL esm_dump_var('qr3d', qr3d(its:ite,kts:kte,j))
+      IF(PRESENT(qi3d)) CALL esm_dump_var('qi3d', qi3d(its:ite,kts:kte,j))
+      IF(PRESENT(qs3d)) CALL esm_dump_var('qs3d', qs3d(its:ite,kts:kte,j))
+      IF(PRESENT(qg3d)) CALL esm_dump_var('qg3d', qg3d(its:ite,kts:kte,j))
+      IF(PRESENT(f_qv)) CALL esm_dump_var('f_qv', f_qv)
+      IF(PRESENT(f_qc)) CALL esm_dump_var('f_qc', f_qc)
+      IF(PRESENT(f_qr)) CALL esm_dump_var('f_qr', f_qr)
+      IF(PRESENT(f_qi)) CALL esm_dump_var('f_qi', f_qi)
+      IF(PRESENT(f_qs)) CALL esm_dump_var('f_qs', f_qs)
+      IF(PRESENT(f_qg)) CALL esm_dump_var('f_qg', f_qg)
+   ENDIF
    i_loop: DO I=its,ite
 
 ! reverse vars 
@@ -228,6 +264,8 @@ CONTAINS
          ALB0=ALBEDO(I,J)
          obscur0=obscur(I,J)
 ! slope code removed - factor now done in surface driver
+         ! (esm_dump_active: a standalone driver opened the file itself)
+         esm_dump_inner = (esm_dumping .OR. esm_dump_active()) .AND. I == its
            CALL SWPARA(TTEN1D,GSW0,XLAT0,XLONG0,ALB0,              &
                        T1D,QV1D,QC1D,QR1D,QI1D,QS1D,QG1D,P1D,      &
                        XTIME,GMT,RHO01D,DZ,                        &
@@ -235,13 +273,19 @@ CONTAINS
                        RADFRQ,ICLOUD,DEGRAD,aer_dry1,aer_water1,   &
                        kts,kte,                                    &
                        coszen(i,j),julian,obscur0                  ) ! jararias, 14/08/2013, amontornes-bcodina 2015/09 solar eclipses
+         esm_dump_inner = .FALSE.
          GSW(I,J)=GSW0
-         DO K=kts,kte          
+         DO K=kts,kte
             NK=kme-1-K+kms
             RTHRATEN(I,K,J)=RTHRATEN(I,K,J)+TTEN1D(NK)/pi3D(I,K,J)
+            IF(esm_dumping) esm_tten(I,K)=TTEN1D(NK)/pi3D(I,K,J)
          ENDDO
 !
    ENDDO i_loop
+   IF(esm_dumping) THEN
+      CALL esm_dump_var('gsw', gsw(its:ite,j)); CALL esm_dump_var('rthraten_sw', esm_tten)
+      CALL esm_dump_close()
+   ENDIF
    ENDDO j_loop                                          
 
    END SUBROUTINE SWRAD
@@ -263,6 +307,7 @@ CONTAINS
 !       ADD EFFECT OF GRAUPEL
 !------------------------------------------------------------------
 
+  USE module_esm_dump
   IMPLICIT NONE
 
   INTEGER, INTENT(IN ) ::                 kts,kte
@@ -340,8 +385,14 @@ CONTAINS
 ! For slope-dependent radiation
 
    REAL :: diffuse_frac, corr_fac, csza_slp
+! EarthSciML instrumentation: per-layer diagnostics (k=1 top, as in SWPARA)
+   REAL, DIMENSION( kts:kte ) :: e_ww, e_uv, e_totabs, e_alba, e_absc, e_xalb, &
+                                 e_xabsc, e_xabs, e_xsca, e_trans0, e_dscld, e_dsca, e_dabs
 
        GSW=0.0
+       SDOWN=0.; RO=0.; XWVP=0.; XATP=0.; XLWP=0.
+       e_ww=0.; e_uv=0.; e_totabs=0.; e_alba=0.; e_absc=0.; e_xalb=0.; e_xabsc=0.
+       e_xabs=0.; e_xsca=0.; e_trans0=0.; e_dscld=0.; e_dsca=0.; e_dabs=0.
        bext340=5.E-6
        bexth2o=5.E-6
 !       SOLTOP=SOLCON
@@ -468,6 +519,9 @@ CONTAINS
            TRANS0=1.
          ENDIF
          SDOWN(K+1)=AMAX1(1.E-9,SDOWN(K)*TRANS0*0.01)
+         e_ww(K)=WW; e_uv(K)=UV; e_totabs(K)=TOTABS; e_alba(K)=ALBA; e_absc(K)=ABSC
+         e_xalb(K)=XALB; e_xabsc(K)=XABSC; e_xabs(K)=XABS; e_xsca(K)=XSCA; e_trans0(K)=TRANS0
+         e_dscld(K)=DSCLD; e_dsca(K)=DSCA; e_dabs(K)=DABS
          TTEN(K)=SDOWN(K)*(XABSC+XABS*100.+XABSA*100.)*0.01/( &
                  RO(K)*CP*DZ(K))
   200   CONTINUE
@@ -511,6 +565,23 @@ CONTAINS
     ENDIF
 
     7 CONTINUE
+      ! EarthSciML instrumentation: column internals (k=1 = model top; SDOWN
+      ! has kte+1 entries, SDOWN(1) = TOA downward flux; zeros at night).
+      IF(esm_dump_inner) THEN
+         CALL esm_dump_var('soltop', soltop); CALL esm_dump_var('csza', csza)
+         CALL esm_dump_var('albedo_col', albedo); CALL esm_dump_var('gsw_col', gsw)
+         CALL esm_dump_var('t_col', t); CALL esm_dump_var('p_col', p); CALL esm_dump_var('dz_col', dz)
+         CALL esm_dump_var('rho0_col', rho0); CALL esm_dump_var('qv_col', qv); CALL esm_dump_var('qc_col', qc)
+         CALL esm_dump_var('qr_col', qr); CALL esm_dump_var('qi_col', qi); CALL esm_dump_var('qs_col', qs)
+         CALL esm_dump_var('qg_col', qg); CALL esm_dump_var('tten_col', tten)
+         CALL esm_dump_var('ro', ro); CALL esm_dump_var('xwvp', xwvp); CALL esm_dump_var('xatp', xatp)
+         CALL esm_dump_var('xlwp', xlwp); CALL esm_dump_var('sdown', sdown)
+         CALL esm_dump_var('ww_cum', e_ww); CALL esm_dump_var('uv_cum', e_uv); CALL esm_dump_var('totabs_cum', e_totabs)
+         CALL esm_dump_var('alba', e_alba); CALL esm_dump_var('absc', e_absc)
+         CALL esm_dump_var('xalb', e_xalb); CALL esm_dump_var('xabsc', e_xabsc); CALL esm_dump_var('xabs', e_xabs)
+         CALL esm_dump_var('xsca', e_xsca); CALL esm_dump_var('trans0', e_trans0)
+         CALL esm_dump_var('dscld_cum', e_dscld); CALL esm_dump_var('dsca_cum', e_dsca); CALL esm_dump_var('dabs_cum', e_dabs)
+      ENDIF
 !
    END SUBROUTINE SWPARA
 
