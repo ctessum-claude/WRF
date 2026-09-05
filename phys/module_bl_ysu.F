@@ -3,6 +3,7 @@
  module module_bl_ysu
  use ccpp_kind_types,only: kind_phys
  use bl_ysu
+ use module_esm_dump
 
 
  implicit none
@@ -309,6 +310,7 @@
                                                              kpbl2d_hv
    real,                   dimension(its:ite)              ::              &
                                                              frcurb_hv
+   logical :: esm_dumping
 
 !-----------------------------------------------------------------------------------------------------------------
 
@@ -402,6 +404,33 @@
          ctopo2_hv(i) = ctopo2(i,j)
       end do
 !
+      ! EarthSciML instrumentation (module_esm_dump): dump every kernel input
+      ! for this tile before the call, every output after it.
+      esm_dumping = esm_dump_want('ysu')
+      if (esm_dumping) then
+         call esm_dump_open('ysu')
+         call esm_dump_var('j', j)
+         call esm_dump_var('its', its); call esm_dump_var('ite', ite)
+         call esm_dump_var('kts', kts); call esm_dump_var('kte', kte); call esm_dump_var('kme', kme)
+         call esm_dump_var('dt', dt)
+         call esm_dump_var('cp', cp); call esm_dump_var('g', g); call esm_dump_var('rovcp', rovcp)
+         call esm_dump_var('rd', rd); call esm_dump_var('rovg', rovg); call esm_dump_var('xlv', xlv)
+         call esm_dump_var('rv', rv); call esm_dump_var('ep1', ep1); call esm_dump_var('ep2', ep2)
+         call esm_dump_var('karman', karman)
+         call esm_dump_var('f_qc', flag_qc); call esm_dump_var('f_qi', flag_qi)
+         call esm_dump_var('ysu_topdown_pblmix', l_topdown_pblmix); call esm_dump_var('flag_bep', flag_bep)
+         call esm_dump_var('ux', u3d_hv); call esm_dump_var('vx', v3d_hv); call esm_dump_var('tx', t3d_hv)
+         call esm_dump_var('qvx', qv3d_hv); call esm_dump_var('qcx', qc3d_hv); call esm_dump_var('qix', qi3d_hv)
+         call esm_dump_var('p2d', p3d_hv); call esm_dump_var('p2di', p3di_hv); call esm_dump_var('pi2d', pi3d_hv)
+         call esm_dump_var('dz8w2d', dz8w_hv); call esm_dump_var('rthraten', rthraten_hv)
+         call esm_dump_var('psfcpa', psfc_hv); call esm_dump_var('znt', znt_hv); call esm_dump_var('ust', ust_hv)
+         call esm_dump_var('psim', psim_hv); call esm_dump_var('psih', psih_hv); call esm_dump_var('xland', xland_hv)
+         call esm_dump_var('hfx', hfx_hv); call esm_dump_var('qfx', qfx_hv); call esm_dump_var('wspd', wspd_hv)
+         call esm_dump_var('br', br_hv); call esm_dump_var('u10_in', u10_hv); call esm_dump_var('v10_in', v10_hv)
+         call esm_dump_var('uox', uoce_hv); call esm_dump_var('vox', voce_hv)
+         call esm_dump_var('ctopo', ctopo_hv); call esm_dump_var('ctopo2', ctopo2_hv)
+         call esm_dump_var('frcurb', frcurb_hv)
+      end if
       call bl_ysu_run(ux=u3d_hv,vx=v3d_hv                                      &
               ,tx=t3d_hv                                                       &
               ,qvx=qv3d_hv,qcx=qc3d_hv,qix=qi3d_hv                             &
@@ -439,6 +468,17 @@
               ,flag_bep=flag_bep                                               &
               ,its=its,ite=ite,kte=kte,kme=kme                                 &
               ,errmsg=errmsg,errflg=errflg                                     )
+      if (esm_dumping) then
+         call esm_dump_var('utnp', rublten_hv); call esm_dump_var('vtnp', rvblten_hv)
+         call esm_dump_var('ttnp', rthblten_hv); call esm_dump_var('qvtnp', rqvblten_hv)
+         call esm_dump_var('qctnp', rqcblten_hv); call esm_dump_var('qitnp', rqiblten_hv)
+         call esm_dump_var('exch_hx', exch_h_hv); call esm_dump_var('exch_mx', exch_m_hv)
+         call esm_dump_var('hpbl', hpbl_hv); call esm_dump_var('kpbl1d', kpbl2d_hv)
+         call esm_dump_var('wstar', wstar_hv); call esm_dump_var('delta', delta_hv)
+         call esm_dump_var('u10', u10_hv); call esm_dump_var('v10', v10_hv)
+         call esm_dump_var('errflg', errflg)
+         call esm_dump_close()
+      end if
 !
       !  Assign local data back to full-sized arrays.
       !  Only required for the INTENT(OUT) or INTENT(INOUT) arrays.

@@ -625,6 +625,7 @@ module_madwrf.o: \
 
 
 module_bl_ysu.o: \
+	module_esm_dump.o \
 	ccpp_kind_types.o \
 	physics_mmm/bl_ysu.o
 
