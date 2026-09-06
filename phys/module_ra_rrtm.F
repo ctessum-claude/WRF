@@ -6610,6 +6610,8 @@ CONTAINS
          RADCLRU(IPR) = RADUEMIT(IPR) + (1. - SEMIS(IPR))  & 
                         * RADCLRD(IPR)                                           
          CLRURAD = CLRURAD + RADCLRU(IPR)                                        
+         ESM_UBAND(NGB(IPR),0) = ESM_UBAND(NGB(IPR),0) + RADLU(IPR)
+         ESM_UCLBAND(NGB(IPR),0) = ESM_UCLBAND(NGB(IPR),0) + RADCLRU(IPR)
  3500 CONTINUE                                                                   
       TOTUFLUX(0) = URAD * WTNUM                                                 
       TOTUCLFL(0) = CLRURAD * WTNUM                                              
