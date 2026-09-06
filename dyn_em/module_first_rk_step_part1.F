@@ -39,6 +39,7 @@ CONTAINS
                             )
     USE module_state_description
     USE module_model_constants
+    USE module_esm_dump
     USE module_domain, ONLY : domain, domain_clock_get, get_ijk_from_subgrid
     USE module_configure, ONLY : grid_config_rec_type, model_config_rec
     USE module_radiation_driver, ONLY : pre_radiation_driver, radiation_driver
@@ -148,6 +149,10 @@ CONTAINS
     INTEGER  num_road_layers
     INTEGER  iswater
     LOGICAL  :: l_flux
+    ! EarthSciML subassembly instrumentation (column its of row jps, once per step)
+    LOGICAL  :: esm_sa_rad, esm_sa_pbl, esm_sa_all
+    INTEGER  :: esm_i1, esm_i2, esm_k1, esm_k2, esm_j
+    REAL, ALLOCATABLE :: esm_tmp(:,:)
     INTEGER  :: isurban
     INTEGER  rk_step
     INTEGER                         :: yr, month, day, hr, minute, sec, rc
@@ -268,6 +273,35 @@ BENCH_END(phy_prep_tim)
      &        ,num_tiles=grid%num_tiles                                        )
 
       CALL wrf_debug ( 200 , ' call radiation_driver' )
+      ! EarthSciML: radiation subassembly inputs (state after phy_prep)
+      esm_i1 = ips; esm_i2 = MIN(ipe, ide-1); esm_k1 = kps; esm_k2 = MIN(kpe, kde-1); esm_j = jps
+      esm_sa_rad = esm_dump_want('subassembly_rad')
+      IF (esm_sa_rad) THEN
+        CALL esm_dump_open('subassembly_rad')
+        CALL esm_dump_var('itimestep', grid%itimestep); CALL esm_dump_var('dt', grid%dt)
+        CALL esm_dump_var('xtime', grid%xtime); CALL esm_dump_var('julian', grid%julian); CALL esm_dump_var('gmt', grid%gmt)
+        CALL esm_dump_var('its', esm_i1); CALL esm_dump_var('ite', esm_i2); CALL esm_dump_var('kts', esm_k1); CALL esm_dump_var('kte', esm_k2); CALL esm_dump_var('j', esm_j)
+        CALL esm_dump_var('th', th_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('t', t_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('p', p_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('pi', pi_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('p8w', p8w(esm_i1:esm_i2,esm_k1:esm_k2+1,esm_j)); CALL esm_dump_var('t8w', t8w(esm_i1:esm_i2,esm_k1:esm_k2+1,esm_j))
+        CALL esm_dump_var('dz8w', dz8w(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('z', grid%z(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('z8w', grid%z_at_w(esm_i1:esm_i2,esm_k1:esm_k2+1,esm_j)); CALL esm_dump_var('rho', grid%rho(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('u', grid%u_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('v', grid%v_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('qv', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QV))
+        IF (P_QC >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qc', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QC))
+        IF (P_QI >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qi', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QI))
+        IF (P_QR >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qr', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QR))
+        IF (P_QS >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qs', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QS))
+        IF (P_QG >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qg', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QG))
+        CALL esm_dump_var('psfc', grid%psfc(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('ht', grid%ht(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('xlat', grid%xlat(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('xlong', grid%xlong(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('xland', grid%xland(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('tsk', grid%tsk(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('albedo', grid%albedo(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('emiss', grid%emiss(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('snowc', grid%snowc(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('radt', grid%radt); CALL esm_dump_var('stepra', grid%stepra)
+        CALL esm_dump_var('ra_lw_physics', config_flags%ra_lw_physics); CALL esm_dump_var('ra_sw_physics', config_flags%ra_sw_physics)
+        CALL esm_dump_var('icloud', config_flags%icloud); CALL esm_dump_var('swrad_scat', config_flags%swrad_scat)
+      END IF
 BENCH_START(rad_driver_tim)
 
       CALL radiation_driver(                                                  &
@@ -541,10 +575,66 @@ BENCH_START(rad_driver_tim)
                                                       )
 
 BENCH_END(rad_driver_tim)
+      ! EarthSciML: radiation subassembly outputs
+      IF (esm_sa_rad) THEN
+        CALL esm_dump_var('rthraten', grid%rthraten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('rthratenlw', grid%rthratenlw(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('rthratensw', grid%rthratensw(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('cldfra', grid%cldfra(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('gsw', grid%gsw(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('glw', grid%glw(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('olr', grid%olr(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('swdown', grid%swdown(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('coszen', grid%coszen(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_close()
+      END IF
 
 !********* Surface driver
 ! surface
 
+      ! EarthSciML: surface + PBL subassembly inputs (state entering surface_driver)
+      esm_sa_pbl = esm_dump_want('subassembly_pbl')
+      IF (esm_sa_pbl) THEN
+        CALL esm_dump_open('subassembly_pbl')
+        CALL esm_dump_var('itimestep', grid%itimestep); CALL esm_dump_var('dt', grid%dt)
+        CALL esm_dump_var('xtime', grid%xtime); CALL esm_dump_var('julian', grid%julian); CALL esm_dump_var('gmt', grid%gmt)
+        CALL esm_dump_var('its', esm_i1); CALL esm_dump_var('ite', esm_i2); CALL esm_dump_var('kts', esm_k1); CALL esm_dump_var('kte', esm_k2); CALL esm_dump_var('j', esm_j)
+        CALL esm_dump_var('th', th_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('t', t_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('p', p_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('pi', pi_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('p8w', p8w(esm_i1:esm_i2,esm_k1:esm_k2+1,esm_j)); CALL esm_dump_var('t8w', t8w(esm_i1:esm_i2,esm_k1:esm_k2+1,esm_j))
+        CALL esm_dump_var('dz8w', dz8w(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('z', grid%z(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('z8w', grid%z_at_w(esm_i1:esm_i2,esm_k1:esm_k2+1,esm_j)); CALL esm_dump_var('rho', grid%rho(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('u', grid%u_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('v', grid%v_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('qv', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QV))
+        IF (P_QC >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qc', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QC))
+        IF (P_QI >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qi', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QI))
+        IF (P_QR >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qr', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QR))
+        IF (P_QS >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qs', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QS))
+        IF (P_QG >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qg', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QG))
+        CALL esm_dump_var('psfc', grid%psfc(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('ht', grid%ht(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('xlat', grid%xlat(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('xlong', grid%xlong(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('xland', grid%xland(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('tsk', grid%tsk(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('albedo', grid%albedo(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('emiss', grid%emiss(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('snowc', grid%snowc(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('gsw', grid%gsw(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('glw', grid%glw(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('swdown', grid%swdown(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('rthraten', grid%rthraten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('num_soil_layers', config_flags%num_soil_layers)
+        CALL esm_dump_var('zs', grid%zs(1:config_flags%num_soil_layers)); CALL esm_dump_var('dzs', grid%dzs(1:config_flags%num_soil_layers))
+        CALL esm_dump_var('tslb', grid%tslb(esm_i1:esm_i2,1:config_flags%num_soil_layers,esm_j))
+        CALL esm_dump_var('tmn', grid%tmn(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('capg', grid%capg(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('mavail', grid%mavail(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('qsfc', grid%qsfc(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('ust', grid%ust(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('znt', grid%znt(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('hfx', grid%hfx(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('qfx', grid%qfx(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('lh', grid%lh(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('grdflx', grid%grdflx(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('pblh', grid%pblh(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('kpbl', grid%kpbl(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('regime', grid%regime(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('mol', grid%mol(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('rmol', grid%rmol(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('br', grid%br(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('flhc', grid%flhc(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('flqc', grid%flqc(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('psim', psim(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('psih', psih(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('u10', grid%u10(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('v10', grid%v10(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('th2', grid%th2(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('t2', grid%t2(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('q2', grid%q2(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('sf_sfclay_physics', config_flags%sf_sfclay_physics); CALL esm_dump_var('sf_surface_physics', config_flags%sf_surface_physics)
+        CALL esm_dump_var('bl_pbl_physics', config_flags%bl_pbl_physics); CALL esm_dump_var('isfflx', config_flags%isfflx); CALL esm_dump_var('ifsnow', config_flags%ifsnow)
+        CALL esm_dump_var('ysu_topdown_pblmix', config_flags%ysu_topdown_pblmix)
+      END IF
 BENCH_START(surf_driver_tim)
 
 !gmm halo of wtd and riverflow for leafhydro
@@ -1401,6 +1491,67 @@ BENCH_START(pbl_driver_tim)
 #endif
 
 BENCH_END(pbl_driver_tim)
+      ! EarthSciML: surface + PBL subassembly outputs
+      IF (esm_sa_pbl) THEN
+        CALL esm_dump_var('hfx_out', grid%hfx(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('qfx_out', grid%qfx(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('lh_out', grid%lh(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('grdflx_out', grid%grdflx(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('tsk_out', grid%tsk(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('tslb_out', grid%tslb(esm_i1:esm_i2,1:config_flags%num_soil_layers,esm_j))
+        CALL esm_dump_var('qsfc_out', grid%qsfc(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('ust_out', grid%ust(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('znt_out', grid%znt(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('pblh_out', grid%pblh(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('kpbl_out', grid%kpbl(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('regime_out', grid%regime(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('mol_out', grid%mol(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('rmol_out', grid%rmol(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('br_out', grid%br(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('flhc_out', grid%flhc(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('flqc_out', grid%flqc(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('psim_out', psim(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('psih_out', psih(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('gz1oz0_out', gz1oz0(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('chklowq_out', chklowq(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('capg_out', grid%capg(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('u10_out', grid%u10(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('v10_out', grid%v10(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('th2_out', grid%th2(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('t2_out', grid%t2(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('q2_out', grid%q2(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('exch_h', grid%exch_h(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('exch_m', grid%exch_m(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('rublten', grid%rublten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('rvblten', grid%rvblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('rthblten', grid%rthblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('rqvblten', grid%rqvblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('rqcblten', grid%rqcblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('rqiblten', grid%rqiblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_close()
+      END IF
+      ! EarthSciML: full-physics tendency sum for this step (cu_physics = shcu = fdda = 0 in the reference run,
+      ! so the only physics tendencies are radiation + PBL; microphysics adjusts the state in solve_em)
+      esm_sa_all = esm_dump_want('subassembly_all')
+      IF (esm_sa_all) THEN
+        CALL esm_dump_open('subassembly_all')
+        CALL esm_dump_var('itimestep', grid%itimestep); CALL esm_dump_var('dt', grid%dt)
+        CALL esm_dump_var('xtime', grid%xtime); CALL esm_dump_var('julian', grid%julian); CALL esm_dump_var('gmt', grid%gmt)
+        CALL esm_dump_var('its', esm_i1); CALL esm_dump_var('ite', esm_i2); CALL esm_dump_var('kts', esm_k1); CALL esm_dump_var('kte', esm_k2); CALL esm_dump_var('j', esm_j)
+        CALL esm_dump_var('th', th_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('t', t_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('p', p_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('pi', pi_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('p8w', p8w(esm_i1:esm_i2,esm_k1:esm_k2+1,esm_j)); CALL esm_dump_var('t8w', t8w(esm_i1:esm_i2,esm_k1:esm_k2+1,esm_j))
+        CALL esm_dump_var('dz8w', dz8w(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('z', grid%z(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('z8w', grid%z_at_w(esm_i1:esm_i2,esm_k1:esm_k2+1,esm_j)); CALL esm_dump_var('rho', grid%rho(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('u', grid%u_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('v', grid%v_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('qv', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QV))
+        IF (P_QC >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qc', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QC))
+        IF (P_QI >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qi', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QI))
+        IF (P_QR >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qr', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QR))
+        IF (P_QS >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qs', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QS))
+        IF (P_QG >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qg', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QG))
+        CALL esm_dump_var('psfc', grid%psfc(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('ht', grid%ht(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('xlat', grid%xlat(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('xlong', grid%xlong(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('xland', grid%xland(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('tsk', grid%tsk(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('albedo', grid%albedo(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('emiss', grid%emiss(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('snowc', grid%snowc(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('cu_physics', config_flags%cu_physics); CALL esm_dump_var('shcu_physics', config_flags%shcu_physics)
+        CALL esm_dump_var('grid_fdda', config_flags%grid_fdda)
+        CALL esm_dump_var('rthraten', grid%rthraten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('rthblten', grid%rthblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('rublten', grid%rublten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('rvblten', grid%rvblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('rqvblten', grid%rqvblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('rqcblten', grid%rqcblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        CALL esm_dump_var('rqiblten', grid%rqiblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+        ALLOCATE(esm_tmp(esm_i1:esm_i2,esm_k1:esm_k2))
+        esm_tmp = grid%rthraten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j) + grid%rthblten(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)
+        CALL esm_dump_var('rth_phys_sum', esm_tmp)
+        DEALLOCATE(esm_tmp)
+        CALL esm_dump_var('hfx', grid%hfx(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('qfx', grid%qfx(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('gsw', grid%gsw(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('glw', grid%glw(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('olr', grid%olr(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_var('pblh', grid%pblh(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('tsk_out', grid%tsk(esm_i1:esm_i2,esm_j))
+        CALL esm_dump_close()
+      END IF
 
 !*****
 ! fire 

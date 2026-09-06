@@ -7,6 +7,7 @@ SUBROUTINE solve_em ( grid , config_flags  &
                     )
 ! Driver layer modules
    USE module_state_description
+   USE module_esm_dump
    USE module_domain, ONLY : &
                   domain, get_ijk_from_grid, get_ijk_from_subgrid                          &
                  ,domain_get_current_time, domain_get_start_time                           &
@@ -179,6 +180,9 @@ SUBROUTINE solve_em ( grid , config_flags  &
 
    INTEGER :: rk_order, iwmax, jwmax, kwmax
    REAL :: dt_rk, dts_rk, dts, dtm, wmax
+   ! EarthSciML subassembly instrumentation (microphysics step)
+   LOGICAL :: esm_sa_mp
+   INTEGER :: esm_i1, esm_i2, esm_k1, esm_k2, esm_j
    REAL , ALLOCATABLE , DIMENSION(:)  :: max_vert_cfl_tmp, max_horiz_cfl_tmp
    LOGICAL :: leapfrog
    INTEGER :: l,kte,kk
@@ -3853,6 +3857,27 @@ BENCH_END(moist_physics_prep_tim)
      specified_bdy = config_flags%specified .OR. config_flags%nested
      channel_bdy = config_flags%specified .AND. config_flags%periodic_x
 
+     ! EarthSciML: microphysics step inputs (state after dynamics, before microphysics_driver)
+     esm_i1 = ips; esm_i2 = MIN(ipe, ide-1); esm_k1 = kps; esm_k2 = MIN(kpe, kde-1); esm_j = jps
+     esm_sa_mp = esm_dump_want('subassembly_mp')
+     IF (esm_sa_mp) THEN
+       CALL esm_dump_open('subassembly_mp')
+       CALL esm_dump_var('itimestep', grid%itimestep); CALL esm_dump_var('dt', dtm)
+       CALL esm_dump_var('xtime', grid%xtime); CALL esm_dump_var('mp_physics', config_flags%mp_physics)
+       CALL esm_dump_var('its', esm_i1); CALL esm_dump_var('ite', esm_i2); CALL esm_dump_var('kts', esm_k1); CALL esm_dump_var('kte', esm_k2); CALL esm_dump_var('j', esm_j)
+       CALL esm_dump_var('p', p_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('pi', pi_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+       CALL esm_dump_var('p8w', p8w(esm_i1:esm_i2,esm_k1:esm_k2+1,esm_j)); CALL esm_dump_var('dz8w', dz8w(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+       CALL esm_dump_var('rho', grid%rho(esm_i1:esm_i2,esm_k1:esm_k2,esm_j)); CALL esm_dump_var('z', grid%z(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+     CALL esm_dump_var('th', th_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+     CALL esm_dump_var('qv', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QV))
+     IF (P_QC >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qc', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QC))
+     IF (P_QI >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qi', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QI))
+     IF (P_QR >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qr', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QR))
+     IF (P_QS >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qs', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QS))
+     IF (P_QG >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qg', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QG))
+     CALL esm_dump_var('rainnc', grid%rainnc(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('snownc', grid%snownc(esm_i1:esm_i2,esm_j))
+     CALL esm_dump_var('graupelnc', grid%graupelnc(esm_i1:esm_i2,esm_j))
+     END IF
 BENCH_START(micro_driver_tim)
 
 !
@@ -4151,6 +4176,21 @@ BENCH_START(micro_driver_tim)
 
                                                                           
 BENCH_END(micro_driver_tim)
+     ! EarthSciML: microphysics step outputs
+     IF (esm_sa_mp) THEN
+     CALL esm_dump_var('th_out', th_phy(esm_i1:esm_i2,esm_k1:esm_k2,esm_j))
+     CALL esm_dump_var('qv_out', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QV))
+     IF (P_QC >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qc_out', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QC))
+     IF (P_QI >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qi_out', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QI))
+     IF (P_QR >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qr_out', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QR))
+     IF (P_QS >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qs_out', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QS))
+     IF (P_QG >= PARAM_FIRST_SCALAR) CALL esm_dump_var('qg_out', moist(esm_i1:esm_i2,esm_k1:esm_k2,esm_j,P_QG))
+     CALL esm_dump_var('rainnc_out', grid%rainnc(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('snownc_out', grid%snownc(esm_i1:esm_i2,esm_j))
+     CALL esm_dump_var('graupelnc_out', grid%graupelnc(esm_i1:esm_i2,esm_j))
+       CALL esm_dump_var('rainncv', grid%rainncv(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('snowncv', grid%snowncv(esm_i1:esm_i2,esm_j))
+       CALL esm_dump_var('graupelncv', grid%graupelncv(esm_i1:esm_i2,esm_j)); CALL esm_dump_var('sr', grid%sr(esm_i1:esm_i2,esm_j))
+       CALL esm_dump_close()
+     END IF
 
 #if 0
 BENCH_START(microswap_2)

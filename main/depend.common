@@ -4138,6 +4138,7 @@ module_em.o: \
 
 
 module_first_rk_step_part1.o: \
+	../phys/module_esm_dump.o \
 	module_big_step_utilities_em.o \
 	../frame/module_comm_dm.o \
 	../frame/module_configure.o \
@@ -4320,6 +4321,7 @@ shift_domain_em.o: \
 
 
 solve_em.o: \
+	../phys/module_esm_dump.o \
 	module_after_all_rk_steps.o \
 	module_avgflx_em.o \
 	../share/module_bc.o \
