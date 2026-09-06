@@ -2299,6 +2299,21 @@ CONTAINS
                      JP,JT,JT1,INDSELF,ITR,WX,PFRAC,TAUG,       &
                      LAYTROP,LAYSWTCH,LAYLOW                    )
 
+      ! EarthSciML instrumentation: gas optics (GASABS) and SETCOEF outputs for
+      ! column its.  TAUG/PFRAC/ITR are (NGPT, 1:NLAYERS); ITR indexes the
+      ! TAU/TF/TRANS tables (TAU(i) = BPADE (i/5000)/(1 - i/5000)).
+      IF(esm_dump_inner) THEN
+         CALL esm_dump_var('taug', taug); CALL esm_dump_var('pfrac', pfrac); CALL esm_dump_var('itr', itr)
+         CALL esm_dump_var('fac00', fac00); CALL esm_dump_var('fac01', fac01)
+         CALL esm_dump_var('fac10', fac10); CALL esm_dump_var('fac11', fac11)
+         CALL esm_dump_var('forfac', forfac); CALL esm_dump_var('selffac', selffac); CALL esm_dump_var('selffrac', selffrac)
+         CALL esm_dump_var('jp', jp); CALL esm_dump_var('jt', jt); CALL esm_dump_var('jt1', jt1); CALL esm_dump_var('indself', indself)
+         CALL esm_dump_var('laytrop', laytrop); CALL esm_dump_var('layswtch', layswtch); CALL esm_dump_var('laylow', laylow)
+         CALL esm_dump_var('co2mult', co2mult); CALL esm_dump_var('wkl', wkl); CALL esm_dump_var('wx', wx)
+         CALL esm_dump_var('bpade', bpade); CALL esm_dump_var('fluxfac', fluxfac); CALL esm_dump_var('heatfac', heatfac)
+         CALL esm_dump_var('ngb', ngb); CALL esm_dump_var('delwave', delwave); CALL esm_dump_var('totplnk', totplnk)
+      ENDIF
+
 !  Check for cloud in column.  Use original CCM LW threshold: if total           
 !  clear sky fraction < 0.999, then column is cloudy, otherwise consider         
 !  it clear.  Also, set up flag array, icldlyr, for use in radiative             
@@ -6282,6 +6297,7 @@ CONTAINS
 !  integration can cause errors of 1 to 4 W/m2 within cloudy layers.             
 !-------------------------------------------------------------------------
                                                                                  
+      USE module_esm_dump
       INTEGER, INTENT(IN )    ::      kts,ktep1
  
       INTEGER, DIMENSION( NGPT,kts:ktep1 ),               &
@@ -6318,6 +6334,11 @@ CONTAINS
       REAL, DIMENSION(   0:ktep1 )              ::        &
                                                 TOTUCLFL, &
                                                 TOTDCLFL
+      ! EarthSciML instrumentation: per-band partial fluxes (radiance sums
+      ! before the WTNUM*FLUXFAC scaling are accumulated, scaled at the end).
+      REAL, DIMENSION( NBANDS, 0:ktep1 ) :: ESM_DBAND, ESM_UBAND
+      REAL, DIMENSION( NBANDS, 0:ktep1 ) :: ESM_DCLBAND, ESM_UCLBAND
+      REAL :: ESM_SECANG, ESM_WTNUM
 
       REAL, DIMENSION(   0:ktep1 )              ::        &
                                                     FNET, &
@@ -6408,6 +6429,8 @@ CONTAINS
          TOTDFLUX(LAY) = 0.0                                                     
          TOTUCLFL(LAY) = 0.0                                                     
          TOTDCLFL(LAY) = 0.0                                                     
+         ESM_DBAND(:,LAY) = 0.0; ESM_UBAND(:,LAY) = 0.0
+         ESM_DCLBAND(:,LAY) = 0.0; ESM_UCLBAND(:,LAY) = 0.0
          INDLEV(LAY) = TZ(LAY) - 159.                                            
          TLEVFRAC(LAY) = TZ(LAY) - INT(TZ(LAY))                                  
  200  CONTINUE                                                                   
@@ -6517,10 +6540,12 @@ CONTAINS
                EFCLFRAC(LEV) * (1.-ABSS(INDEX))) + GASSRC +        &             
                CLDFRAC(LEV) * (BBDLEVD * ATOT(INDEX) - GASSRC)                   
             DRAD = DRAD + RADLD(IPR)                                             
+            ESM_DBAND(NGB(IPR),LEV-1) = ESM_DBAND(NGB(IPR),LEV-1) + RADLD(IPR)
 !     Clear sky radiance                                                         
             RADCLRD(IPR) = RADCLRD(IPR) + (BBD - RADCLRD(IPR))     & 
                          * ABSS(INDEX)                                           
             CLRDRAD = CLRDRAD + RADCLRD(IPR)                                     
+            ESM_DCLBAND(NGB(IPR),LEV-1) = ESM_DCLBAND(NGB(IPR),LEV-1) + RADCLRD(IPR)
  2000    CONTINUE                                                                
                                                                                  
          ELSE                                                                    
@@ -6545,15 +6570,18 @@ CONTAINS
             RADLD(IPR) = RADLD(IPR) + (BBD - RADLD(IPR)) *     & 
                          ABSS(INDEX)                                             
             DRAD = DRAD + RADLD(IPR)                                             
+            ESM_DBAND(NGB(IPR),LEV-1) = ESM_DBAND(NGB(IPR),LEV-1) + RADLD(IPR)
 !     Set clear sky stream to total sky stream as long as layers                 
 !     remain clear.  Streams diverge when a cloud is reached.                    
             IF (ICLDDN.EQ.1) THEN                                                
                RADCLRD(IPR) = RADCLRD(IPR) + (BBD - RADCLRD(IPR)) *   & 
                               ABSS(INDEX)                                        
                CLRDRAD = CLRDRAD + RADCLRD(IPR)                                  
+               ESM_DCLBAND(NGB(IPR),LEV-1) = ESM_DCLBAND(NGB(IPR),LEV-1) + RADCLRD(IPR)
             ELSE                                                                 
                RADCLRD(IPR) = RADLD(IPR)                                         
                CLRDRAD = DRAD                                                    
+               ESM_DCLBAND(NGB(IPR),LEV-1) = ESM_DCLBAND(NGB(IPR),LEV-1) + RADCLRD(IPR)
             ENDIF                                                                
                                                                                  
  2100    CONTINUE                                                               
@@ -6609,10 +6637,12 @@ CONTAINS
                EFCLFRAC(LEV) * (1.-ABSS(INDEX))) + GASSRC +          &
                CLDFRAC(LEV) * (BBUTOT(INDEX) * ATOT(INDEX) - GASSRC)             
             URAD = URAD + RADLU(IPR)                                             
+            ESM_UBAND(NGB(IPR),LEV) = ESM_UBAND(NGB(IPR),LEV) + RADLU(IPR)
 !     Clear sky radiance                                                         
             RADCLRU(IPR) = RADCLRU(IPR) + (BBU(INDEX) - RADCLRU(IPR)) * &        
                            ABSS(INDEX)                                           
             CLRURAD = CLRURAD + RADCLRU(IPR)                                     
+            ESM_UCLBAND(NGB(IPR),LEV) = ESM_UCLBAND(NGB(IPR),LEV) + RADCLRU(IPR)
  4000    CONTINUE                                                                
                                                                                  
          ELSE                                                                    
@@ -6625,12 +6655,14 @@ CONTAINS
             RADLU(IPR) = RADLU(IPR) + (BBU(INDEX)-RADLU(IPR)) *  & 
                          ABSS(INDEX)                                             
             URAD = URAD + RADLU(IPR)                                             
+            ESM_UBAND(NGB(IPR),LEV) = ESM_UBAND(NGB(IPR),LEV) + RADLU(IPR)
 !     Clear sky radiance                                                         
 !     Upward clear and total sky streams must remain separate because surface    
 !     reflectance is different for each.                                         
             RADCLRU(IPR) = RADCLRU(IPR) + (BBU(INDEX) - RADCLRU(IPR))   &         
                            * ABSS(INDEX)                                         
             CLRURAD = CLRURAD + RADCLRU(IPR)                                     
+            ESM_UCLBAND(NGB(IPR),LEV) = ESM_UCLBAND(NGB(IPR),LEV) + RADCLRU(IPR)
  4100    CONTINUE                                                                
                                                                                  
          ENDIF                                                                   
@@ -6666,7 +6698,20 @@ CONTAINS
          HTRC(L) = HEATFAC * (FNETC(L) - FNETC(LEV)) / (PZ(L) - PZ(LEV))         
  7000 CONTINUE                                                                   
       HTR(NLAYERS) = 0.0                                                         
-      HTRC(NLAYERS) = 0.0                                                                                                                                  
+      HTRC(NLAYERS) = 0.0                                                        
+      ! EarthSciML instrumentation: RTRN internals for column its.
+      IF(esm_dump_inner) THEN
+         ESM_SECANG = SECANG; ESM_WTNUM = WTNUM
+         ESM_DBAND = ESM_DBAND * WTNUM * FLUXFAC; ESM_UBAND = ESM_UBAND * WTNUM * FLUXFAC
+         ESM_DCLBAND = ESM_DCLBAND * WTNUM * FLUXFAC; ESM_UCLBAND = ESM_UCLBAND * WTNUM * FLUXFAC
+         CALL esm_dump_var('secang', ESM_SECANG); CALL esm_dump_var('wtnum', ESM_WTNUM)
+         CALL esm_dump_var('totuclfl', totuclfl); CALL esm_dump_var('totdclfl', totdclfl)
+         CALL esm_dump_var('plankbnd', plankbnd); CALL esm_dump_var('plnkemit', plnkemit)
+         CALL esm_dump_var('plvl', plvl); CALL esm_dump_var('play', play)
+         CALL esm_dump_var('icldlyr', icldlyr)
+         CALL esm_dump_var('totdflux_band', ESM_DBAND); CALL esm_dump_var('totuflux_band', ESM_UBAND)
+         CALL esm_dump_var('totdclfl_band', ESM_DCLBAND); CALL esm_dump_var('totuclfl_band', ESM_UCLBAND)
+      ENDIF                                                                          
 
       END  SUBROUTINE RTRN
 
