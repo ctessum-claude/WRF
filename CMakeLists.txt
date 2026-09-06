@@ -370,7 +370,11 @@ else()
   message( STATUS "Finished checking out external repos via manage_externals" )
 endif()
 
-if ( ${ENABLE_CFBM} )
+if ( ${ENABLE_CFBM} AND EXISTS ${PROJECT_SOURCE_DIR}/phys/fire_behavior/CMakeLists.txt )
+  # EarthSciML: the fire_behavior submodule is already initialised (instrumented fork); do not let
+  # manage_externals replace it.
+  message( STATUS "Using the initialised phys/fire_behavior submodule; skipping manage_externals" )
+elseif ( ${ENABLE_CFBM} )
   message( STATUS "Checking out CFBM external repo via manage_externals" )
   set( LOG_FILE      ${CMAKE_CURRENT_BINARY_DIR}/checkout_externals_cfbm.log )
   execute_process(
