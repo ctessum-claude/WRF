@@ -35,7 +35,7 @@ module module_esm_dump
   implicit none
   private
   public :: esm_dump_want, esm_dump_open, esm_dump_open_file, esm_dump_close, esm_dump_var
-  public :: esm_dump_active, esm_dump_inner
+  public :: esm_dump_active, esm_dump_inner, esm_dump_col
 
   ! esm_dump_inner: set by a wrapper (or driver) to let dump calls placed
   ! INSIDE a kernel (sub-process diagnostics) append to the open file.  The
@@ -140,6 +140,23 @@ contains
   logical function esm_dump_active() result(active)
     active = unit /= -1
   end function esm_dump_active
+
+  ! Horizontal tile index whose in-kernel (per-column) diagnostics are dumped.
+  ! Column physics is called once per (i,j); the wrapper dumps the internals of
+  ! a single column, by default the tile's first (its).  ESM_DUMP_I overrides
+  ! that with a 1-based i index, so a 3-D run can dump a chosen column (e.g.
+  ! the storm core of an idealized supercell) instead of the domain edge.
+  integer function esm_dump_col(default_i) result(icol)
+    integer, intent(in) :: default_i
+    character(len=32) :: val
+    integer :: stat, ios, v
+    icol = default_i
+    call get_environment_variable('ESM_DUMP_I', val, status=stat)
+    if (stat /= 0) return
+    if (len_trim(val) == 0) return
+    read(val, *, iostat=ios) v
+    if (ios == 0) icol = v
+  end function esm_dump_col
 
   subroutine header(name, kind, shape)
     character(len=*), intent(in) :: name, kind

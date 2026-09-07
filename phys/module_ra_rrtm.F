@@ -2026,8 +2026,9 @@ CONTAINS
          GLW0=0. 
          OLR0=0. 
          TSFC=TSK(I,J)
-         esm_dump_inner = (esm_dumping .OR. esm_dump_active()) .AND. I == its
+         esm_dump_inner = (esm_dumping .OR. esm_dump_active()) .AND. I == esm_dump_col(its)
          IF(esm_dump_inner) THEN
+            CALL esm_dump_var('i_col', I)
             CALL esm_dump_var('pw1d', pw1d); CALL esm_dump_var('tw1d', tw1d)
             CALL esm_dump_var('t1d', t1d); CALL esm_dump_var('p1d', p1d); CALL esm_dump_var('dz1d', dz1d)
             CALL esm_dump_var('qv1d', qv1d); CALL esm_dump_var('qc1d', qc1d); CALL esm_dump_var('qr1d', qr1d)
