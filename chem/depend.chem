@@ -374,3 +374,6 @@ module_cam_mam_gas_wetdep_driver.o: ../frame/module_state_description.o  ../phys
 
 module_cam_mam_mo_sethet.o: ../phys/module_cam_support.o module_cam_mam_mo_chem_utls.o ../phys/module_cam_shr_kind_mod.o ../phys/module_cam_physconst.o
 
+
+# EarthSciML instrumentation: the RADM2 KPP interface dumps through module_esm_dump
+module_kpp_radm2_interface.o: ../phys/module_esm_dump.o

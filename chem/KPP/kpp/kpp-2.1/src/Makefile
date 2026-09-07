@@ -79,7 +79,7 @@ lex.yy.c: scan.l scan.h
 
 y.tab.c: scan.y scan.h
 	@echo "  "$(YACC) scan.y
-	@$(YACC) scan.y
+	@$(YACC) -d scan.y
 
 flex: lex.yy.c y.tab.c
 
