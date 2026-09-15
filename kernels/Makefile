@@ -14,7 +14,7 @@ B = build
 P = ../phys
 M = ../phys/physics_mmm
 
-DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver
+DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/solar_driver
 all: $(DRIVERS)
 
 $(B):
@@ -60,3 +60,16 @@ $(B)/slab_driver: slab_driver.F90 $(COMMON) $(B)/module_sf_slab.o
 
 clean:
 	rm -rf $(B)
+
+# solar geometry: radconst + calc_coszen extracted verbatim from the radiation driver
+$(B)/solar_kernels.F90: $(P)/module_radiation_driver.F | $(B)
+	( echo 'module solar_kernels'; echo 'contains'; \
+	  awk '/^   SUBROUTINE radconst\(/,/END SUBROUTINE radconst/' $<; \
+	  awk '/^   SUBROUTINE calc_coszen\(/,/END SUBROUTINE calc_coszen/' $<; \
+	  echo 'end module solar_kernels' ) > $@
+$(B)/wrf_error_stub.o: wrf_error_stub.F90 | $(B)
+	$(FC) $(FFLAGS) -J$(B) -c $< -o $@
+$(B)/solar_kernels.o: $(B)/solar_kernels.F90 $(B)/wrf_error_stub.o
+	$(FC) $(FFLAGS) -J$(B) -I$(B) -c $< -o $@
+$(B)/solar_driver: solar_driver.F90 $(B)/solar_kernels.o $(B)/module_esm_dump.o
+	$(FC) $(FFLAGS) -J$(B) -I$(B) $< $(B)/solar_kernels.o $(B)/wrf_error_stub.o $(B)/module_esm_dump.o -o $@

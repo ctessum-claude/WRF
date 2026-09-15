@@ -58,6 +58,7 @@ CONTAINS
     USE module_fddaobs_driver, ONLY : fddaobs_driver
     USE module_bc, ONLY : set_physical_bc3d, set_physical_bc2d
     USE module_physics_addtendc, ONLY : update_phy_ten
+    USE module_esm_dump, ONLY : esm_dump_want, esm_dump_open, esm_dump_close, esm_dump_var, esm_dump_col
 
     USE module_sfs_driver !JDM
     USE module_stoch, ONLY : update_stoch_ten, perturb_physics_tend, RAND_PERT_UPDATE, contiguize_2d
@@ -140,6 +141,9 @@ CONTAINS
     INTEGER  rk_step 
     INTEGER  n
     LOGICAL :: stepsp_test
+    ! EarthSciML instrumentation (module_esm_dump): 'theta_m_conv' dump around conv_t_tendf_to_moist
+    LOGICAL :: esm_thm
+    INTEGER :: esm_i, esm_j, esm_kc
 
 #if ( WRF_DFI_RADAR == 1 )
     INTEGER  i_start,i_end,j_start,j_end,i,j,k
@@ -1002,6 +1006,22 @@ BENCH_END(tke_rhs_tim)
          !$OMP END PARALLEL DO
        ENDIF  ! obs_nudge_opt .eq. 1
 
+       ! EarthSciML instrumentation: inputs and output of conv_t_tendf_to_moist for one column
+       esm_thm = .false.
+       IF ( config_flags%use_theta_m .EQ. 1 ) esm_thm = esm_dump_want('theta_m_conv')
+       IF ( esm_thm ) THEN
+         esm_i = esm_dump_col(grid%i_start(1)); esm_j = grid%j_start(1); esm_kc = kde-1
+         CALL esm_dump_open('theta_m_conv')
+         CALL esm_dump_var('i', esm_i); CALL esm_dump_var('j', esm_j); CALL esm_dump_var('kc', esm_kc)
+         CALL esm_dump_var('k_start', k_start); CALL esm_dump_var('k_end', k_end)
+         CALL esm_dump_var('itimestep', grid%itimestep); CALL esm_dump_var('xtime', grid%xtime); CALL esm_dump_var('dt', grid%dt)
+         CALL esm_dump_var('r_v', R_v); CALL esm_dump_var('r_d', R_d); CALL esm_dump_var('t0', T0); CALL esm_dump_var('rvovrd', rvovrd)
+         CALL esm_dump_var('mut', grid%mut(esm_i,esm_j)); CALL esm_dump_var('c1h', grid%c1h(1:esm_kc)); CALL esm_dump_var('c2h', grid%c2h(1:esm_kc))
+         CALL esm_dump_var('t_1', grid%t_1(esm_i,1:esm_kc,esm_j)); CALL esm_dump_var('t_2', grid%t_2(esm_i,1:esm_kc,esm_j))
+         CALL esm_dump_var('qv_old', moist_old(esm_i,1:esm_kc,esm_j,P_qv)); CALL esm_dump_var('qv', moist(esm_i,1:esm_kc,esm_j,P_qv))
+         CALL esm_dump_var('qv_tend', moist_tend(esm_i,1:esm_kc,esm_j,P_qv))
+         CALL esm_dump_var('t_tendf_in', t_tendf(esm_i,1:esm_kc,esm_j))
+       END IF
        IF ( config_flags%use_theta_m .EQ. 1 ) THEN
          !$OMP PARALLEL DO   &
          !$OMP PRIVATE ( ij )
@@ -1016,6 +1036,10 @@ BENCH_END(tke_rhs_tim)
          END DO 
          !$OMP END PARALLEL DO
        END IF ! use moist theta
+       IF ( esm_thm ) THEN
+         CALL esm_dump_var('t_tendf_out', t_tendf(esm_i,1:esm_kc,esm_j))
+         CALL esm_dump_close()
+       END IF
 
 ! calculate vertical diffusion first and then horizontal
 ! (keep this order)
