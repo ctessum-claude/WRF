@@ -376,7 +376,14 @@ compare_kpp_to_species  ( char * kpp_dirname)
            strcpy( pm1->assoc_wrf_name,  "MOLECULAR OXYGEN");
            p1 -> got_o2 = 1;
        }
-       if ( strcmp (name1, kpp_co2) == 0) {
+       /* CO2 is a FIXED species only in mechanisms that declare it under
+          #DEFFIX and have no WRF-Chem transported co2 (t1_mozcart). In the
+          RADM2/RACM/SAPRC99/GOCART-RACM mechanisms CO2 is a #DEFVAR species
+          that the name comparison above already matched to chem(P_co2);
+          overriding that match here dropped CO2 from both copy loops, so
+          VAR(ind_CO2) was never set (uninitialised on the first call, the
+          previous grid cell's value afterwards). */
+       if ( strcmp (name1, kpp_co2) == 0 && pm1->found_match != 1 ) {
           pm1->found_match = 2;
            strcpy( pm1->assoc_wrf_name,  "CO2");
            p1 -> got_co2 = 1;
