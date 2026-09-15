@@ -5,6 +5,7 @@
 MODULE module_em
 
    USE module_model_constants
+   USE module_esm_dump, only: esm_dump_want, esm_dump_open, esm_dump_close, esm_dump_var, esm_dump_col
    
    USE module_advect_em, only: advect_u, advect_v, advect_w, advect_scalar, advect_scalar_pd, advect_scalar_mono, &
         advect_weno_u, advect_weno_v, advect_weno_w, advect_scalar_weno,  advect_scalar_wenopd
@@ -346,6 +347,10 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
    REAL , DIMENSION( ims:ime , jms:jme )         :: muu_old, muu_new                                                              
    REAL , DIMENSION( ims:ime , jms:jme )         :: muv_old, muv_new                                                              
    LOGICAL                                       :: ieva
+   ! EarthSciML: column-dynamics dump (rk_step 1 of a dumped time step)
+   LOGICAL :: esm_dyn
+   INTEGER :: esm_i, esm_j, esm_kc, esm_kn
+   REAL, DIMENSION( kms:kme ) :: esm_ru0, esm_rv0, esm_rw0, esm_t0
    
 !<DESCRIPTION>
 !
@@ -726,6 +731,39 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                                        ims, ime, jms, jme, kms, kme,   &
                                        its, ite, jts, jte, kts, kte   )
 
+   ! EarthSciML: column dynamics -- state entering the large-step w, Coriolis, curvature and damping tendencies
+   esm_dyn = .false.
+   IF ( rk_step == 1 ) esm_dyn = esm_dump_want('dyn_column')
+   IF ( esm_dyn ) THEN
+     esm_i = esm_dump_col(its); esm_j = jts; esm_kc = MIN(kte,kde-1); esm_kn = MIN(kte,kde)
+     CALL esm_dump_open('dyn_column')
+     CALL esm_dump_var('i', esm_i); CALL esm_dump_var('j', esm_j); CALL esm_dump_var('kc', esm_kc); CALL esm_dump_var('kn', esm_kn)
+     CALL esm_dump_var('rk_step', rk_step); CALL esm_dump_var('dt', dt)
+     CALL esm_dump_var('u', u(esm_i,1:esm_kc,esm_j)); CALL esm_dump_var('u_ip1', u(esm_i+1,1:esm_kc,esm_j))
+     CALL esm_dump_var('v', v(esm_i,1:esm_kc,esm_j)); CALL esm_dump_var('v_jp1', v(esm_i,1:esm_kc,esm_j+1))
+     CALL esm_dump_var('w', w(esm_i,1:esm_kn,esm_j)); CALL esm_dump_var('ph', ph(esm_i,1:esm_kn,esm_j)); CALL esm_dump_var('phb', phb(esm_i,1:esm_kn,esm_j))
+     CALL esm_dump_var('ru', ru(esm_i,1:esm_kc,esm_j)); CALL esm_dump_var('rv', rv(esm_i,1:esm_kc,esm_j)); CALL esm_dump_var('rw', rw(esm_i,1:esm_kn,esm_j))
+     CALL esm_dump_var('ww', ww(esm_i,1:esm_kn,esm_j))
+     CALL esm_dump_var('t', t(esm_i,1:esm_kc,esm_j)); CALL esm_dump_var('t_init', t_init(esm_i,1:esm_kc,esm_j))
+     CALL esm_dump_var('p', p(esm_i,1:esm_kc,esm_j)); CALL esm_dump_var('pb', pb(esm_i,1:esm_kc,esm_j))
+     CALL esm_dump_var('al', al(esm_i,1:esm_kc,esm_j)); CALL esm_dump_var('alt', alt(esm_i,1:esm_kc,esm_j))
+     CALL esm_dump_var('cqw', cqw(esm_i,1:esm_kn,esm_j))
+     CALL esm_dump_var('mu', mu(esm_i,esm_j)); CALL esm_dump_var('mut', mut(esm_i,esm_j)); CALL esm_dump_var('mub', mub(esm_i,esm_j))
+     CALL esm_dump_var('muu', muu(esm_i,esm_j)); CALL esm_dump_var('muv', muv(esm_i,esm_j))
+     CALL esm_dump_var('u_base', u_base(1:esm_kc)); CALL esm_dump_var('v_base', v_base(1:esm_kc)); CALL esm_dump_var('t_base', t_base(1:esm_kc))
+     CALL esm_dump_var('qv_base', qv_base(1:esm_kc)); CALL esm_dump_var('z_base', z_base(1:esm_kc))
+     CALL esm_dump_var('fnm', fnm(1:esm_kn)); CALL esm_dump_var('fnp', fnp(1:esm_kn)); CALL esm_dump_var('rdn', rdn(1:esm_kn)); CALL esm_dump_var('rdnw', rdnw(1:esm_kn))
+     CALL esm_dump_var('c1h', c1h(1:esm_kn)); CALL esm_dump_var('c2h', c2h(1:esm_kn)); CALL esm_dump_var('c1f', c1f(1:esm_kn)); CALL esm_dump_var('c2f', c2f(1:esm_kn))
+     CALL esm_dump_var('f', f(esm_i,esm_j)); CALL esm_dump_var('e', e(esm_i,esm_j)); CALL esm_dump_var('sina', sina(esm_i,esm_j)); CALL esm_dump_var('cosa', cosa(esm_i,esm_j))
+     CALL esm_dump_var('msftx', msftx(esm_i,esm_j)); CALL esm_dump_var('msfty', msfty(esm_i,esm_j)); CALL esm_dump_var('msfux', msfux(esm_i,esm_j))
+     CALL esm_dump_var('msfuy', msfuy(esm_i,esm_j)); CALL esm_dump_var('msfvx', msfvx(esm_i,esm_j)); CALL esm_dump_var('msfvy', msfvy(esm_i,esm_j))
+     CALL esm_dump_var('dampcoef', dampcoef); CALL esm_dump_var('zdamp', zdamp); CALL esm_dump_var('damp_opt', damp_opt)
+     CALL esm_dump_var('pert_coriolis', config_flags%pert_coriolis); CALL esm_dump_var('use_theta_m', config_flags%use_theta_m)
+     CALL esm_dump_var('non_hydrostatic', non_hydrostatic); CALL esm_dump_var('top_lid', top_lid)
+     CALL esm_dump_var('g', g); CALL esm_dump_var('t0', t0); CALL esm_dump_var('p1000mb', p1000mb); CALL esm_dump_var('r_d', r_d)
+     CALL esm_dump_var('cp', cp); CALL esm_dump_var('cpovcv', cpovcv); CALL esm_dump_var('rvovrd', rvovrd)
+     esm_rw0 = rw_tend(esm_i,:,esm_j)
+   END IF
    IF (non_hydrostatic) THEN
         CALL pg_buoy_w( rw_tend, p, cqw, mu, mub,       &
                         c1f,c2f,                        &
@@ -734,6 +772,8 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                         ims, ime, jms, jme, kms, kme,   &
                         its, ite, jts, jte, kts, kte   )
    ENDIF
+   IF ( esm_dyn ) CALL esm_dump_var('drw_pg_buoy', rw_tend(esm_i,1:esm_kn,esm_j)-esm_rw0(1:esm_kn))
+   IF ( esm_dyn ) esm_rw0 = rw_tend(esm_i,:,esm_j)
 
    CALL w_damp   ( rw_tend, max_vert_cfl,             &
                     max_horiz_cfl,                    &
@@ -743,6 +783,10 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                     ids, ide, jds, jde, kds, kde,     &
                     ims, ime, jms, jme, kms, kme,     &
                     its, ite, jts, jte, kts, kte     )
+   IF ( esm_dyn ) CALL esm_dump_var('drw_w_damp', rw_tend(esm_i,1:esm_kn,esm_j)-esm_rw0(1:esm_kn))
+   IF ( esm_dyn ) THEN
+     esm_ru0 = ru_tend(esm_i,:,esm_j); esm_rv0 = rv_tend(esm_i,:,esm_j); esm_rw0 = rw_tend(esm_i,:,esm_j)
+   END IF
 
    IF(config_flags%pert_coriolis) THEN
 
@@ -769,6 +813,12 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                         its, ite, jts, jte, kts, kte )
 
    END IF
+   IF ( esm_dyn ) THEN
+     CALL esm_dump_var('dru_coriolis', ru_tend(esm_i,1:esm_kc,esm_j)-esm_ru0(1:esm_kc))
+     CALL esm_dump_var('drv_coriolis', rv_tend(esm_i,1:esm_kc,esm_j)-esm_rv0(1:esm_kc))
+     CALL esm_dump_var('drw_coriolis', rw_tend(esm_i,1:esm_kn,esm_j)-esm_rw0(1:esm_kn))
+     esm_ru0 = ru_tend(esm_i,:,esm_j); esm_rv0 = rv_tend(esm_i,:,esm_j); esm_rw0 = rw_tend(esm_i,:,esm_j)
+   END IF
 
    CALL curvature ( ru, rv, rw, u, v, w,            &
                      ru_tend,  rv_tend,  rw_tend,    &
@@ -779,6 +829,11 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                      ids, ide, jds, jde, kds, kde,   &
                      ims, ime, jms, jme, kms, kme,   &
                      its, ite, jts, jte, kts, kte   )
+   IF ( esm_dyn ) THEN
+     CALL esm_dump_var('dru_curvature', ru_tend(esm_i,1:esm_kc,esm_j)-esm_ru0(1:esm_kc))
+     CALL esm_dump_var('drv_curvature', rv_tend(esm_i,1:esm_kc,esm_j)-esm_rv0(1:esm_kc))
+     CALL esm_dump_var('drw_curvature', rw_tend(esm_i,1:esm_kn,esm_j)-esm_rw0(1:esm_kn))
+   END IF
 
 ! Damping option added for Held-Suarez test (also uses lw option HELDSUAREZ)
 
@@ -930,6 +985,10 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
 
     ENDIF
 
+    IF ( esm_dyn ) THEN
+      esm_ru0 = ru_tendf(esm_i,:,esm_j); esm_rv0 = rv_tendf(esm_i,:,esm_j)
+      esm_rw0 = rw_tendf(esm_i,:,esm_j); esm_t0 = t_tendf(esm_i,:,esm_j)
+    END IF
     IF( damp_opt .eq. 2 )                                      &
        CALL rk_rayleigh_damp( ru_tendf, rv_tendf,              &
                               rw_tendf, t_tendf,               &
@@ -941,6 +1000,12 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                               ids, ide, jds, jde, kds, kde,    &
                               ims, ime, jms, jme, kms, kme,    &
                               its, ite, jts, jte, kts, kte   )
+    IF ( esm_dyn ) THEN
+      CALL esm_dump_var('dru_rayleigh', ru_tendf(esm_i,1:esm_kc,esm_j)-esm_ru0(1:esm_kc))
+      CALL esm_dump_var('drv_rayleigh', rv_tendf(esm_i,1:esm_kc,esm_j)-esm_rv0(1:esm_kc))
+      CALL esm_dump_var('drw_rayleigh', rw_tendf(esm_i,1:esm_kn,esm_j)-esm_rw0(1:esm_kn))
+      CALL esm_dump_var('dt_rayleigh', t_tendf(esm_i,1:esm_kc,esm_j)-esm_t0(1:esm_kc))
+    END IF
 
     IF( rad_nudge .eq. 1 )                                     &
        CALL theta_relaxation( t_tendf, t, t_init,              &
@@ -951,6 +1016,8 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                               its, ite, jts, jte, kts, kte   )
 
   END IF forward_step
+
+   IF ( esm_dyn ) CALL esm_dump_close()
 
 END SUBROUTINE rk_tendency
 
