@@ -14,7 +14,7 @@ B = build
 P = ../phys
 M = ../phys/physics_mmm
 
-DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/solar_driver
+DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/solar_driver $(B)/cldfra_driver
 all: $(DRIVERS)
 
 $(B):
@@ -73,3 +73,16 @@ $(B)/solar_kernels.o: $(B)/solar_kernels.F90 $(B)/wrf_error_stub.o
 	$(FC) $(FFLAGS) -J$(B) -I$(B) -c $< -o $@
 $(B)/solar_driver: solar_driver.F90 $(B)/solar_kernels.o $(B)/module_esm_dump.o
 	$(FC) $(FFLAGS) -J$(B) -I$(B) $< $(B)/solar_kernels.o $(B)/wrf_error_stub.o $(B)/module_esm_dump.o -o $@
+
+# grid-scale cloud fraction: cal_cldfra1 (icloud = 1) extracted verbatim from the
+# radiation driver, against a stub of the four module_state_description ids it reads
+$(B)/cldfra_kernels.F90: $(P)/module_radiation_driver.F | $(B)
+	( echo 'module cldfra_kernels'; echo 'contains'; \
+	  awk '/^   SUBROUTINE cal_cldfra1\(/,/END SUBROUTINE cal_cldfra1/' $<; \
+	  echo 'end module cldfra_kernels' ) > $@
+$(B)/cldfra_state_stub.o: cldfra_state_stub.F90 | $(B)
+	$(FC) $(FFLAGS) -J$(B) -c $< -o $@
+$(B)/cldfra_kernels.o: $(B)/cldfra_kernels.F90 $(B)/cldfra_state_stub.o
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
+$(B)/cldfra_driver: cldfra_driver.F90 $(COMMON) $(B)/cldfra_state_stub.o $(B)/cldfra_kernels.o
+	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
