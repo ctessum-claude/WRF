@@ -86,6 +86,7 @@ SUBROUTINE wesely_driver( id, ktau, dtstep, config_flags, current_month,  &
   USE module_state_description                       
   USE module_data_sorgam
   USE module_state_description, only:  param_first_scalar        
+  USE module_esm_dump
    INTEGER,      INTENT(IN   ) :: id,julday,                              &
                                   numgas, current_month,                  &
                                   ids,ide, jds,jde, kds,kde,              &
@@ -148,6 +149,8 @@ SUBROUTINE wesely_driver( id, ktau, dtstep, config_flags, current_month,  &
       INTEGER :: i, iland, iprt, iseason, j, jce, jcs, n, nr, ipr,jpr,nvr
       LOGICAL :: highnh3, rainflag, vegflag, wetflag
       LOGICAL :: chm_is_moz
+! EarthSciML instrumentation
+      LOGICAL :: esm_dumping
 !--------------------------------------------------
 ! .. Local Arrays
 !--------------------------------------------------
@@ -185,6 +188,8 @@ SUBROUTINE wesely_driver( id, ktau, dtstep, config_flags, current_month,  &
       end if
 
 
+! EarthSciML instrumentation: one call-counter increment per wesely_driver call
+      esm_dumping = esm_dump_want('wesely')
 tile_lat_loop : &
       do j = jts,jte 
 tile_lon_loop : &
@@ -251,6 +256,52 @@ tile_lon_loop : &
             aer_res_zcen(i,j) = 0.
             CALL landusevg( ddvel0d, ustar, rmol(i,j), zntt, z1, dvpart, iland,        &
                             numgas, srfres, aer_res_def(i,j), aer_res_zcen(i,j), p_sulf )
+! EarthSciML instrumentation: the Wesely surface-resistance / deposition-velocity
+! column for i = its, j = jts.  esm_dumping is decided once per wesely_driver call.
+            IF ( esm_dumping .AND. i == its .AND. j == jts ) THEN
+              CALL esm_dump_open('wesely')
+              CALL esm_dump_var('numgas', numgas); CALL esm_dump_var('nlu', nlu)
+              CALL esm_dump_var('dep_seasons', dep_seasons)
+              CALL esm_dump_var('ktau', ktau); CALL esm_dump_var('julday', julday)
+              CALL esm_dump_var('chem_opt', config_flags%chem_opt)
+              CALL esm_dump_var('ivgtyp', ivgtyp(i,j))
+              CALL esm_dump_var('iland', iland); CALL esm_dump_var('iseason', iseason)
+              CALL esm_dump_var('ixxxlu_iland', ixxxlu(iland))
+              CALL esm_dump_var('ta', ta);     CALL esm_dump_var('rad', rad)
+              CALL esm_dump_var('rhchem', rhchem); CALL esm_dump_var('pa', pa)
+              CALL esm_dump_var('clwchem', clwchem)
+              CALL esm_dump_var('ustar', ustar); CALL esm_dump_var('zntt', zntt)
+              CALL esm_dump_var('z1', z1);     CALL esm_dump_var('rmol', rmol(i,j))
+              CALL esm_dump_var('vegfrac', vegfrac)
+              CALL esm_dump_var('tsk', tsk(i,j)); CALL esm_dump_var('gsw', gsw(i,j))
+              CALL esm_dump_var('qv1', moist(i,kts,j,p_qv))
+              CALL esm_dump_var('t1', t_phy(i,kts,j))
+              CALL esm_dump_var('p8w1', p8w(i,kts,j))
+              CALL esm_dump_var('dz8w1', dz8w(i,kts,j))
+              CALL esm_dump_var('rho1', rho_phy(i,kts,j))
+              CALL esm_dump_var('rainflag', rainflag); CALL esm_dump_var('wetflag', wetflag)
+              CALL esm_dump_var('highnh3', highnh3)
+              CALL esm_dump_var('dvpart', dvpart); CALL esm_dump_var('dvfog', dvfog)
+              CALL esm_dump_var('aer_res_def', aer_res_def(i,j))
+              CALL esm_dump_var('aer_res_zcen', aer_res_zcen(i,j))
+!             per-gas: Rc as rc() returns it, the Rc actually used, and vd
+              CALL esm_dump_var('rcx', rcx(1:numgas))
+              CALL esm_dump_var('srfres', srfres(1:numgas))
+              CALL esm_dump_var('ddvel0d', ddvel0d(1:numgas))
+!             the species constants rc() and landusevg() index by gas number
+              CALL esm_dump_var('hstar', hstar(1:numgas))
+              CALL esm_dump_var('hstar4', hstar4(1:numgas))
+              CALL esm_dump_var('f0', f0(1:numgas))
+              CALL esm_dump_var('dhr', dhr(1:numgas))
+              CALL esm_dump_var('dratio', dratio(1:numgas))
+              CALL esm_dump_var('scpr23', scpr23(1:numgas))
+!             the land-use / season tables, as expanded over the USGS categories
+              CALL esm_dump_var('ri', ri);   CALL esm_dump_var('rlu', rlu)
+              CALL esm_dump_var('rac', rac); CALL esm_dump_var('rgss', rgss)
+              CALL esm_dump_var('rgso', rgso); CALL esm_dump_var('rcls', rcls)
+              CALL esm_dump_var('rclo', rclo)
+              CALL esm_dump_close()
+            END IF
 
 !-----------------------------------------------------------
 !wig: CBMZ does not have HO and HO2 last so need to copy all species

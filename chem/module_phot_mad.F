@@ -1406,6 +1406,7 @@
    USE module_state_description
    USE module_model_constants
    USE module_data_radm2
+   USE module_esm_dump
    implicit none
    INTEGER,      INTENT(IN   ) :: id,julday,                    &
                                   ids,ide, jds,jde, kds,kde,    &
@@ -1469,6 +1470,9 @@
       real :: bext340,bexth2o,ctr
       integer :: naerspec
       real :: zsurf
+! EarthSciML instrumentation: dump the Madronich (phot_opt=1) column
+      logical :: esm_dumping
+      real :: esm_phot_s(nreakj-1,kts:kte+1)
 
 !     print *,'gmt,julday in madronich1= ',gmt,julday
       xtime=curr_secs/60._8   !min since simulation start
@@ -1477,6 +1481,8 @@
       xmin=60.*gmt+real(xtime-xhour*60._8,8)
       gmtp=mod(xhour,24._8)
       gmtp=gmtp+xmin/60.
+! EarthSciML instrumentation: one call-counter increment per driver invocation
+      esm_dumping = esm_dump_want('photmad')
 !     print *,'gmtp = ',gmtp,xhour,xmin
       do 100 j=jts,jte
       do 100 i=its,ite
@@ -1586,9 +1592,43 @@
 !            print *,k,rhoa(1),phizz(1),qll(1),aerext(1),o33(1),tt(1),zenita
 !         endif
 !write(0,*)'calling photolysis_mad --------',i,j
+! EarthSciML instrumentation: inputs of the photolysis column (i = its, j = jts)
+        IF ( esm_dumping .AND. i == its .AND. j == jts ) THEN
+          CALL esm_dump_open('photmad')
+          CALL esm_dump_var('kts', kts);  CALL esm_dump_var('kte', kte)
+          CALL esm_dump_var('nreakj', nreakj); CALL esm_dump_var('nabv', nabv)
+          CALL esm_dump_var('nj', nj)
+          CALL esm_dump_var('kl0', kl0);  CALL esm_dump_var('kl1', kl1)
+          CALL esm_dump_var('julday', julday); CALL esm_dump_var('ktau', ktau)
+          CALL esm_dump_var('gmt', gmt);  CALL esm_dump_var('gmtp', real(gmtp))
+          CALL esm_dump_var('curr_secs', curr_secs)
+          CALL esm_dump_var('xlat', xlat(i,j)); CALL esm_dump_var('xlong', xlong(i,j))
+          CALL esm_dump_var('zenith', zenith); CALL esm_dump_var('zenita', zenita)
+          CALL esm_dump_var('azimuth', azimuth)
+          CALL esm_dump_var('zsurf', zsurf); CALL esm_dump_var('dobsi', dobsi)
+          CALL esm_dump_var('phizz', phizz); CALL esm_dump_var('tt', tt)
+          CALL esm_dump_var('rhoa', rhoa);   CALL esm_dump_var('o33', o33)
+          CALL esm_dump_var('aerext', aerext); CALL esm_dump_var('qll', qll)
+!         static spectral and standard-profile tables of module_phot_mad
+          CALL esm_dump_var('wl', wl);   CALL esm_dump_var('fext', fext)
+          CALL esm_dump_var('xs', xs);   CALL esm_dump_var('xqy', xqy)
+          CALL esm_dump_var('txs', txs)
+          CALL esm_dump_var('jpl295', jpl295); CALL esm_dump_var('jpl218', jpl218)
+          CALL esm_dump_var('sra', sra); CALL esm_dump_var('srb', srb)
+          CALL esm_dump_var('zabv', zabv); CALL esm_dump_var('tabv', tabv)
+          CALL esm_dump_var('o3abv', o3abv); CALL esm_dump_var('pabv', pabv)
+          CALL esm_dump_var('caabv', caabv)
+          CALL esm_dump_var('zstd', zstd); CALL esm_dump_var('tstd', tstd)
+          CALL esm_dump_var('airstd', airstd); CALL esm_dump_var('o3std', o3std)
+          CALL esm_dump_var('aerstd', aerstd)
+          esm_dump_inner = .true.
+        END IF
         call photolysis_mad(kte,zenita,zenith,zsurf, &
              phizz,tt,rhoa,o33,aerext,qll,dobsi,phot1, &
              nreacj,iprt,uvb_dd1,uvb_du1,uvb_dir1)
+        esm_dump_inner = .false.
+! EarthSciML instrumentation: j-values as photolysis_mad returns them, in s^-1
+        IF ( esm_dumping .AND. i == its .AND. j == jts ) esm_phot_s = phot1
 !write(0,*)'back from photolysis_mad ---------------------------- '
 !       print *,'after photmad, i,j = ',i,j
         uvrad(i,j)=uvb_dd1+uvb_dir1-uvb_du1
@@ -1597,6 +1637,15 @@
           phot1(n,k)=60.*phot1(n,k)
         END DO
         END DO
+! EarthSciML instrumentation: outputs of the photolysis column
+        IF ( esm_dumping .AND. i == its .AND. j == jts ) THEN
+          CALL esm_dump_var('uvb_dd1', uvb_dd1); CALL esm_dump_var('uvb_du1', uvb_du1)
+          CALL esm_dump_var('uvb_dir1', uvb_dir1)
+          CALL esm_dump_var('uvrad', uvrad(i,j))
+          CALL esm_dump_var('phot1_s', esm_phot_s)
+          CALL esm_dump_var('phot1_min', phot1)
+          CALL esm_dump_close()
+        END IF
  199    continue
         do k=kts,kte
 !
@@ -1640,6 +1689,7 @@ END SUBROUTINE madronich1_driver
       SUBROUTINE photolysis_mad(mkxcc,a,zenith,zsurf,         &
           zmm5,tmm5,pmm5,o3mm5,aerext,wlmm5,                  &
           dobsnew,phot1,nrtest,iprt,uvb_dd1,uvb_du1,uvb_dir1)
+        USE module_esm_dump
         ! Note that nreakj can differ from nreacj in csolve1!!!!!!
         ! ----- INPUT ------------------------------------------------
         ! Input from MM5
@@ -1718,6 +1768,8 @@ END SUBROUTINE madronich1_driver
         INTEGER :: ii
         REAL vcol(nj), scol(nj)
 
+        INTEGER :: esm_lv(3), esm_il
+        REAL :: esm_s(3,130,nreakj), esm_qy(3,130,nreakj), esm_ao3(3,130), esm_ao2(3,130)
         ! EXTERNAL o3scal, optics, srband, subgrid, trapez
         ! wave length range !!! If photolysis is also desired for levels above
         ! 2
@@ -1936,6 +1988,35 @@ END SUBROUTINE madronich1_driver
 
         ! ----------------------------------------------------------------------
 
+! EarthSciML instrumentation: regridded column, optical inputs, SR cross sections
+        IF ( esm_dump_inner ) THEN
+          CALL esm_dump_var('nlevel', nlevel); CALL esm_dump_var('nlayer', nlayer)
+          CALL esm_dump_var('zz', zz);   CALL esm_dump_var('t_col', t)
+          CALL esm_dump_var('air_col', air); CALL esm_dump_var('o3_col', o3)
+          CALL esm_dump_var('aer_col', aer); CALL esm_dump_var('cloud_col', cloud)
+          CALL esm_dump_var('z', z(1:nlevel)); CALL esm_dump_var('zmid', zmid(1:nlevel))
+          CALL esm_dump_var('vair', vair(1:nlevel)); CALL esm_dump_var('vo3', vo3(1:nlevel))
+          CALL esm_dump_var('vaer', vaer(1:nlevel)); CALL esm_dump_var('vcld', vcld(1:nlevel))
+          CALL esm_dump_var('vt', vt(1:nlevel));   CALL esm_dump_var('cvo2', cvo2(1:nlevel))
+          CALL esm_dump_var('arayl', arayl); CALL esm_dump_var('aaer', aaer)
+          CALL esm_dump_var('albedoph', albedoph)
+          CALL esm_dump_var('omray', omray); CALL esm_dump_var('gray', gray)
+          CALL esm_dump_var('omaer', omaer); CALL esm_dump_var('gaer', gaer)
+          CALL esm_dump_var('omcld', omcld); CALL esm_dump_var('gcld', gcld)
+          CALL esm_dump_var('hair', hair);   CALL esm_dump_var('haer', haer)
+          CALL esm_dump_var('ho3', ho3)
+!         level-resolved cross sections / quantum yields at three sample levels
+          esm_lv(1) = 1; esm_lv(2) = max(1,nlevel/2); esm_lv(3) = nlevel
+          DO esm_il = 1, 3
+            esm_s(esm_il,:,:)  = s(esm_lv(esm_il),:,:)
+            esm_qy(esm_il,:,:) = qy(esm_lv(esm_il),:,:)
+            esm_ao3(esm_il,:)  = ao3(esm_lv(esm_il),:)
+            esm_ao2(esm_il,:)  = ao2(esm_lv(esm_il),:)
+          END DO
+          CALL esm_dump_var('sample_levels', esm_lv)
+          CALL esm_dump_var('s_sample', esm_s);   CALL esm_dump_var('qy_sample', esm_qy)
+          CALL esm_dump_var('ao3_sample', esm_ao3); CALL esm_dump_var('ao2_sample', esm_ao2)
+        END IF
         CALL optics(iprt, &
           zenith, a, dsdh, nid, &
           vair,arayl,gray,omray,ao2,vo3,ao3,vcld,gcld,omcld, &
@@ -1966,6 +2047,16 @@ END SUBROUTINE madronich1_driver
               d(nr,lev) = d(nr,lev) + dj
 50      CONTINUE
 
+! EarthSciML instrumentation: actinic fluxes and the j-values on the RT grid
+        IF ( esm_dump_inner ) THEN
+          CALL esm_dump_var('fldir', fldir(1:nlevel,:))
+          CALL esm_dump_var('fldn',  fldn(1:nlevel,:))
+          CALL esm_dump_var('flup',  flup(1:nlevel,:))
+          CALL esm_dump_var('endir', endir(1:nlevel,:))
+          CALL esm_dump_var('endn',  endn(1:nlevel,:))
+          CALL esm_dump_var('enup',  enup(1:nlevel,:))
+          CALL esm_dump_var('d_rt',  d(:,1:nlevel))
+        END IF
 ! calculate spectral irradiance at surface:
          uvb_dd1=0.
          uvb_du1=0.

@@ -127,7 +127,7 @@ module_subs_tuv.o: params_mod.o la_srb.o rtrans.o
 
 module_phot_tuv.o: params_mod.o module_subs_tuv.o la_srb.o rxn.o rdxs.o
 
-module_phot_mad.o: module_data_radm2.o
+module_phot_mad.o: module_data_radm2.o ../phys/module_esm_dump.o
 
 module_phot_fastj.o: module_mosaic_driver.o module_peg_util.o module_data_cbmz.o module_data_mosaic_therm.o
 
@@ -149,7 +149,7 @@ module_input_dust_errosion.o: module_aerosols_sorgam.o module_aerosols_soa_vbs.o
 
 module_input_gocart_dms.o: module_aerosols_sorgam.o module_aerosols_soa_vbs.o module_aerosols_soa_vbs_het.o
 
-module_dep_simple.o: module_data_sorgam.o module_aerosols_soa_vbs.o module_aerosols_soa_vbs_het.o ../share/module_HLaw.o module_chem_utilities.o 
+module_dep_simple.o: ../phys/module_esm_dump.o module_data_sorgam.o module_aerosols_soa_vbs.o module_aerosols_soa_vbs_het.o ../share/module_HLaw.o module_chem_utilities.o 
 
 module_mosaic_wetscav.o: module_data_mosaic_asect.o module_dep_simple.o
 
