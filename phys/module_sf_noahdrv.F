@@ -129,6 +129,56 @@ CONTAINS
                  )
 
 !----------------------------------------------------------------
+! EarthSciML instrumentation: SFLX in/out for point (its, jts), plus the Noah
+! parameter tables REDPRM reads, so a standalone driver can replay the call.
+    USE module_esm_dump, only: esm_dump_want, esm_dump_open, esm_dump_var, esm_dump_close
+    USE module_sf_noahlsm, only: esmt_NROTBL=>NROTBL, &
+       esmt_SNUPTBL=>SNUPTBL, &
+       esmt_RSTBL=>RSTBL, &
+       esmt_RGLTBL=>RGLTBL, &
+       esmt_HSTBL=>HSTBL, &
+       esmt_MAXALB=>MAXALB, &
+       esmt_EMISSMINTBL=>EMISSMINTBL, &
+       esmt_EMISSMAXTBL=>EMISSMAXTBL, &
+       esmt_LAIMINTBL=>LAIMINTBL, &
+       esmt_LAIMAXTBL=>LAIMAXTBL, &
+       esmt_Z0MINTBL=>Z0MINTBL, &
+       esmt_Z0MAXTBL=>Z0MAXTBL, &
+       esmt_ALBEDOMINTBL=>ALBEDOMINTBL, &
+       esmt_ALBEDOMAXTBL=>ALBEDOMAXTBL, &
+       esmt_ZTOPVTBL=>ZTOPVTBL, &
+       esmt_ZBOTVTBL=>ZBOTVTBL, &
+       esmt_TOPT_DATA=>TOPT_DATA, &
+       esmt_CMCMAX_DATA=>CMCMAX_DATA, &
+       esmt_CFACTR_DATA=>CFACTR_DATA, &
+       esmt_RSMAX_DATA=>RSMAX_DATA, &
+       esmt_BB=>BB, &
+       esmt_DRYSMC=>DRYSMC, &
+       esmt_F11=>F11, &
+       esmt_MAXSMC=>MAXSMC, &
+       esmt_REFSMC=>REFSMC, &
+       esmt_SATPSI=>SATPSI, &
+       esmt_SATDK=>SATDK, &
+       esmt_SATDW=>SATDW, &
+       esmt_WLTSMC=>WLTSMC, &
+       esmt_QTZ=>QTZ, &
+       esmt_SLOPE_DATA=>SLOPE_DATA, &
+       esmt_SBETA_DATA=>SBETA_DATA, &
+       esmt_FXEXP_DATA=>FXEXP_DATA, &
+       esmt_CSOIL_DATA=>CSOIL_DATA, &
+       esmt_SALP_DATA=>SALP_DATA, &
+       esmt_REFDK_DATA=>REFDK_DATA, &
+       esmt_REFKDT_DATA=>REFKDT_DATA, &
+       esmt_FRZK_DATA=>FRZK_DATA, &
+       esmt_ZBOT_DATA=>ZBOT_DATA, &
+       esmt_SMLOW_DATA=>SMLOW_DATA, &
+       esmt_SMHIGH_DATA=>SMHIGH_DATA, &
+       esmt_CZIL_DATA=>CZIL_DATA, &
+       esmt_LVCOEF_DATA=>LVCOEF_DATA, &
+       esmt_LUCATS=>LUCATS, &
+       esmt_BARE=>BARE, &
+       esmt_SLCATS=>SLCATS, &
+       esmt_SLPCATS=>SLPCATS
     IMPLICIT NONE
 !----------------------------------------------------------------
 !----------------------------------------------------------------
@@ -404,6 +454,7 @@ CONTAINS
       LOGICAL :: FRZGRA, SNOWNG
 
       LOGICAL :: IPRINT
+      LOGICAL :: esm_dumping   ! EarthSciML instrumentation
 
 ! ----------------------------------------------------------------------
 ! DECLARATIONS - INTEGER
@@ -764,6 +815,7 @@ CONTAINS
      SLDPTH(NS)=DZS(NS)
      ENDDO
 
+     esm_dumping = esm_dump_want('noah')
      JLOOP : DO J=jts,jte
 
       IF(ITIMESTEP.EQ.1)THEN
@@ -1122,6 +1174,63 @@ CONTAINS
        sfcheadrt_hydro = 0.
        infxsrt_hydro = 0.
 #endif
+!--- EarthSciML instrumentation: SFLX inputs (state at the start of the step)
+       IF (esm_dumping .AND. I == its .AND. J == jts) THEN
+         CALL esm_dump_open('noah')
+         CALL esm_dump_var('i', I); CALL esm_dump_var('j', J); CALL esm_dump_var('itimestep', ITIMESTEP)
+         CALL esm_dump_var('ffrozp', FFROZP); CALL esm_dump_var('isurban', ISURBAN); CALL esm_dump_var('dt', DT)
+         CALL esm_dump_var('zlvl', ZLVL); CALL esm_dump_var('nsoil', NSOIL); CALL esm_dump_var('sldpth', SLDPTH)
+         CALL esm_dump_var('local', LOCAL); CALL esm_dump_var('lutype', TRIM(LUTYPE)); CALL esm_dump_var('sltype', TRIM(SLTYPE))
+         CALL esm_dump_var('lwdn', LWDN); CALL esm_dump_var('soldn', SOLDN); CALL esm_dump_var('solnet', SOLNET)
+         CALL esm_dump_var('sfcprs', SFCPRS); CALL esm_dump_var('prcp', PRCP); CALL esm_dump_var('sfctmp', SFCTMP)
+         CALL esm_dump_var('q2k', Q2K); CALL esm_dump_var('th2', TH2); CALL esm_dump_var('q2sat', Q2SAT)
+         CALL esm_dump_var('dqsdt2', DQSDT2)
+         CALL esm_dump_var('vegtyp', VEGTYP); CALL esm_dump_var('soiltyp', SOILTYP); CALL esm_dump_var('slopetyp', SLOPETYP)
+         CALL esm_dump_var('shdfac', SHDFAC); CALL esm_dump_var('shdmin', SHMIN); CALL esm_dump_var('shdmax', SHMAX)
+         CALL esm_dump_var('albbrd', ALBBRD); CALL esm_dump_var('snoalb', SNOALB1); CALL esm_dump_var('tbot', TBOT)
+         CALL esm_dump_var('z0brd', Z0BRD); CALL esm_dump_var('z0', Z0K); CALL esm_dump_var('emissi', EMISSI)
+         CALL esm_dump_var('embrd', EMBRD)
+         CALL esm_dump_var('cmc', CMC); CALL esm_dump_var('t1', T1); CALL esm_dump_var('stc', STC)
+         CALL esm_dump_var('smc', SMC); CALL esm_dump_var('sh2o', SWC); CALL esm_dump_var('snowh', SNOWHK)
+         CALL esm_dump_var('sneqv', SNEQV); CALL esm_dump_var('albedo', ALBEDOK); CALL esm_dump_var('ch', CHK)
+         CALL esm_dump_var('xlai', XLAI); CALL esm_dump_var('rdlai2d', RDLAI2D); CALL esm_dump_var('usemonalb', USEMONALB)
+         CALL esm_dump_var('snotime1', SNOTIME1); CALL esm_dump_var('ribb', RIBB); CALL esm_dump_var('ua_phys', UA_PHYS)
+         CALL esm_dump_var('opt_thcnd', OPT_THCND); CALL esm_dump_var('fasdas', fasdas)
+         CALL esm_dump_var('irrigation_channel', IRRIGATION_CHANNEL)
+         CALL esm_dump_var('sfcheadrt', sfcheadrt_hydro); CALL esm_dump_var('aoasis', AOASIS); CALL esm_dump_var('dummy', DUMMY)
+!        (context: the atmosphere/radiation fields the driver formed these from)
+         CALL esm_dump_var('tsk', TSK(I,J)); CALL esm_dump_var('hfx_prev', HFX(I,J)); CALL esm_dump_var('qfx_prev', QFX(I,J))
+         CALL esm_dump_var('glw', GLW(I,J)); CALL esm_dump_var('swdown', SWDOWN(I,J)); CALL esm_dump_var('gsw', GSW(I,J))
+         CALL esm_dump_var('chs', CHS(I,J)); CALL esm_dump_var('chs2', CHS2(I,J)); CALL esm_dump_var('cqs2', CQS2(I,J))
+         CALL esm_dump_var('qgh', QGH(I,J)); CALL esm_dump_var('t3d1', T3D(I,1,J)); CALL esm_dump_var('qv3d1', QV3D(I,1,J))
+         CALL esm_dump_var('p8w1', P8W3D(I,1,J)); CALL esm_dump_var('dz8w1', DZ8W(I,1,J))
+         CALL esm_dump_var('rainbl', RAINBL(I,J))
+!        (the REDPRM parameter tables)
+         CALL esm_dump_var('tbl_nrotbl', esmt_NROTBL); CALL esm_dump_var('tbl_snuptbl', esmt_SNUPTBL)
+         CALL esm_dump_var('tbl_rstbl', esmt_RSTBL); CALL esm_dump_var('tbl_rgltbl', esmt_RGLTBL)
+         CALL esm_dump_var('tbl_hstbl', esmt_HSTBL); CALL esm_dump_var('tbl_shdtbl', SHDTBL)
+         CALL esm_dump_var('tbl_maxalb', esmt_MAXALB)
+         CALL esm_dump_var('tbl_emissmintbl', esmt_EMISSMINTBL); CALL esm_dump_var('tbl_emissmaxtbl', esmt_EMISSMAXTBL)
+         CALL esm_dump_var('tbl_laimintbl', esmt_LAIMINTBL); CALL esm_dump_var('tbl_laimaxtbl', esmt_LAIMAXTBL)
+         CALL esm_dump_var('tbl_z0mintbl', esmt_Z0MINTBL); CALL esm_dump_var('tbl_z0maxtbl', esmt_Z0MAXTBL)
+         CALL esm_dump_var('tbl_albedomintbl', esmt_ALBEDOMINTBL); CALL esm_dump_var('tbl_albedomaxtbl', esmt_ALBEDOMAXTBL)
+         CALL esm_dump_var('tbl_ztopvtbl', esmt_ZTOPVTBL); CALL esm_dump_var('tbl_zbotvtbl', esmt_ZBOTVTBL)
+         CALL esm_dump_var('topt_data', esmt_TOPT_DATA); CALL esm_dump_var('cmcmax_data', esmt_CMCMAX_DATA)
+         CALL esm_dump_var('cfactr_data', esmt_CFACTR_DATA); CALL esm_dump_var('rsmax_data', esmt_RSMAX_DATA)
+         CALL esm_dump_var('tbl_bb', esmt_BB); CALL esm_dump_var('tbl_drysmc', esmt_DRYSMC); CALL esm_dump_var('tbl_f11', esmt_F11)
+         CALL esm_dump_var('tbl_maxsmc', esmt_MAXSMC); CALL esm_dump_var('tbl_refsmc', esmt_REFSMC)
+         CALL esm_dump_var('tbl_satpsi', esmt_SATPSI); CALL esm_dump_var('tbl_satdk', esmt_SATDK)
+         CALL esm_dump_var('tbl_satdw', esmt_SATDW); CALL esm_dump_var('tbl_wltsmc', esmt_WLTSMC)
+         CALL esm_dump_var('tbl_qtz', esmt_QTZ); CALL esm_dump_var('tbl_slope_data', esmt_SLOPE_DATA)
+         CALL esm_dump_var('sbeta_data', esmt_SBETA_DATA); CALL esm_dump_var('fxexp_data', esmt_FXEXP_DATA)
+         CALL esm_dump_var('csoil_data', esmt_CSOIL_DATA); CALL esm_dump_var('salp_data', esmt_SALP_DATA)
+         CALL esm_dump_var('refdk_data', esmt_REFDK_DATA); CALL esm_dump_var('refkdt_data', esmt_REFKDT_DATA)
+         CALL esm_dump_var('frzk_data', esmt_FRZK_DATA); CALL esm_dump_var('zbot_data', esmt_ZBOT_DATA)
+         CALL esm_dump_var('smlow_data', esmt_SMLOW_DATA); CALL esm_dump_var('smhigh_data', esmt_SMHIGH_DATA)
+         CALL esm_dump_var('czil_data', esmt_CZIL_DATA); CALL esm_dump_var('lvcoef_data', esmt_LVCOEF_DATA)
+         CALL esm_dump_var('lucats', esmt_LUCATS); CALL esm_dump_var('bare', esmt_BARE); CALL esm_dump_var('natural', NATURAL)
+         CALL esm_dump_var('slcats', esmt_SLCATS); CALL esm_dump_var('slpcats', esmt_SLPCATS)
+       ENDIF
        CALL SFLX (I,J,FFROZP, ISURBAN, DT,ZLVL,NSOIL,SLDPTH,       &    !C
                  LOCAL,                                            &    !L
                  LUTYPE, SLTYPE,                                   &    !CL
@@ -1150,6 +1259,29 @@ CONTAINS
                 ,OPT_THCND,AOASIS                                  &    !O
                 ,XSDA_QFX, HFX_PHY, QFX_PHY, XQNORM, fasdas, HCPCT_FASDAS    &   ! fasdas
                 ,IRRIGATION_CHANNEL)
+!--- EarthSciML instrumentation: SFLX outputs (state after DT, fluxes over the step)
+       IF (esm_dumping .AND. I == its .AND. J == jts) THEN
+         CALL esm_dump_var('cmc_out', CMC); CALL esm_dump_var('t1_out', T1); CALL esm_dump_var('stc_out', STC)
+         CALL esm_dump_var('smc_out', SMC); CALL esm_dump_var('sh2o_out', SWC); CALL esm_dump_var('snowh_out', SNOWHK)
+         CALL esm_dump_var('sneqv_out', SNEQV); CALL esm_dump_var('albedo_out', ALBEDOK); CALL esm_dump_var('ch_out', CHK)
+         CALL esm_dump_var('emissi_out', EMISSI); CALL esm_dump_var('z0_out', Z0K); CALL esm_dump_var('z0brd_out', Z0BRD)
+         CALL esm_dump_var('eta', ETA); CALL esm_dump_var('sheat', SHEAT); CALL esm_dump_var('eta_kinematic', ETA_KINEMATIC)
+         CALL esm_dump_var('fdown', FDOWN); CALL esm_dump_var('ec', EC); CALL esm_dump_var('edir', EDIR)
+         CALL esm_dump_var('et', ET); CALL esm_dump_var('ett', ETT); CALL esm_dump_var('esnow', ESNOW)
+         CALL esm_dump_var('drip', DRIP); CALL esm_dump_var('dew', DEW); CALL esm_dump_var('beta', BETA)
+         CALL esm_dump_var('etp', ETP); CALL esm_dump_var('ssoil', SSOIL)
+         CALL esm_dump_var('flx1', FLX1); CALL esm_dump_var('flx2', FLX2); CALL esm_dump_var('flx3', FLX3)
+         CALL esm_dump_var('snomlt', SNOMLT); CALL esm_dump_var('sncovr', SNCOVR)
+         CALL esm_dump_var('runoff1', RUNOFF1); CALL esm_dump_var('runoff2', RUNOFF2); CALL esm_dump_var('runoff3', RUNOFF3)
+         CALL esm_dump_var('rc', RC); CALL esm_dump_var('pc', PC); CALL esm_dump_var('rsmin', RSMIN)
+         CALL esm_dump_var('xlai_out', XLAI); CALL esm_dump_var('rcs', RCS); CALL esm_dump_var('rct', RCT)
+         CALL esm_dump_var('rcq', RCQ); CALL esm_dump_var('rcsoil', RCSOIL)
+         CALL esm_dump_var('soilw', SOILW); CALL esm_dump_var('soilm', SOILM); CALL esm_dump_var('q1', Q1)
+         CALL esm_dump_var('smav', SMAV); CALL esm_dump_var('snotime1_out', SNOTIME1)
+         CALL esm_dump_var('smcwlt', SMCWLT); CALL esm_dump_var('smcdry', SMCDRY); CALL esm_dump_var('smcref', SMCREF)
+         CALL esm_dump_var('smcmax', SMCMAX); CALL esm_dump_var('nroot', NROOT)
+         CALL esm_dump_close()
+       ENDIF
 
 #ifdef WRF_HYDRO
                  soldrain(i,j) = RUNOFF2*DT*1000.0

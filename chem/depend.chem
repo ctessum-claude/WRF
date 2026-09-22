@@ -247,7 +247,7 @@ module_aerosols_soa_vbs_het.o: module_data_soa_vbs_het.o module_radm.o module_mo
 
 module_aerosols_sorgam_vbs.o: module_data_sorgam_vbs.o module_mosaic_wetscav.o
 
-module_mosaic_drydep.o: module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_mosaic_driver.o
+module_mosaic_drydep.o: ../phys/module_esm_dump.o module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_mosaic_driver.o
 
 module_mosaic_initmixrats.o: module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o
 
@@ -267,7 +267,7 @@ module_mosaic2_driver.o: module_peg_util.o module_mosaic_csuesat.o module_data_m
 
 module_mosaic_sumpm.o: module_data_mosaic_asect.o
 
-module_mosaic_driver.o: module_peg_util.o module_mosaic_csuesat.o module_data_mosaic_asect.o module_data_mosaic_other.o module_data_mosaic_therm.o module_mosaic_movesect.o module_mosaic_therm.o module_mosaic_newnuc.o module_mosaic_coag.o module_mosaic_wetscav.o module_mosaic2_driver.o module_mosaic_sumpm.o
+module_mosaic_driver.o: ../phys/module_esm_dump.o module_peg_util.o module_mosaic_csuesat.o module_data_mosaic_asect.o module_data_mosaic_other.o module_data_mosaic_therm.o module_mosaic_movesect.o module_mosaic_therm.o module_mosaic_newnuc.o module_mosaic_coag.o module_mosaic_wetscav.o module_mosaic2_driver.o module_mosaic_sumpm.o
 
 module_cmu_dvode_solver.o:
 

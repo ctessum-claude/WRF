@@ -77,7 +77,12 @@
 !   local variables
         integer :: i, ic, j, k
 
-#if (CASENAME == 0) || (CASENAME == 1) || (CASENAME == 2) || (CASENAME == 3)
+! EarthSciML instrumentation: CASENAME is hard-wired to 4 above, which compiled
+! this whole initializer out, so a chem_in_opt = 0 run started every MOSAIC bin
+! at exactly zero (EqWeFiC FORTRAN_BUGS N82).  CASENAME 4 is admitted here so
+! aer_ic_opt = 1 gives the four constant-mixing-ratio lognormal modes of
+! mosaic_init_wrf_mixrats_opt1 (accumulation, Aitken, dust, sea salt).
+#if (CASENAME == 0) || (CASENAME == 1) || (CASENAME == 2) || (CASENAME == 3) || (CASENAME == 4)
 	if (config_flags%aer_ic_opt == aer_ic_pnnl) then
 	    call mosaic_init_wrf_mixrats_opt2(   &
 		iflagaa, config_flags,           &

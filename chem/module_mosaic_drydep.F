@@ -37,6 +37,7 @@
 	use module_data_mosaic_other
 	use module_mosaic_driver, only:  mapaer_tofrom_host
 	use module_peg_util, only:  peg_error_fatal
+	use module_esm_dump, only:  esm_dump_want, esm_dump_open, esm_dump_var, esm_dump_close
 
 	implicit none
 
@@ -93,6 +94,10 @@
 
 	real dum
 	real vdep_aer(maxd_asize,maxd_atype,maxd_aphase)
+!   EarthSciML instrumentation: surface-layer inputs and bin deposition velocities, column (its, jts)
+	logical :: esm_dumping
+	integer :: esm_l
+	character(len=16) :: esm_tag
 
 	character*100 msg
 
@@ -161,6 +166,7 @@
 	ijcount_dum = 0
 
 
+	esm_dumping = esm_dump_want('mosaic_drydep')
 	do 2920 jt = jts, jte
 	do 2910 it = its, ite
 
@@ -185,6 +191,31 @@
 
 	call mosaic_drydep_1clm( idiagaa_dum, it, jt,   &
 		ust(it,jt), aer_res(it,jt), vdep_aer )
+	if (esm_dumping .and. (it == its) .and. (jt == jts)) then
+	    call esm_dump_open('mosaic_drydep')
+	    call esm_dump_var('it', it); call esm_dump_var('jt', jt); call esm_dump_var('ktau', ktau)
+	    call esm_dump_var('ust', ust(it,jt)); call esm_dump_var('aer_res', aer_res(it,jt))
+	    call esm_dump_var('t_phy', t_phy(it,kts,jt)); call esm_dump_var('p_phy', p_phy(it,kts,jt))
+	    call esm_dump_var('rho_phy', rho_phy(it,kts,jt))
+	    call esm_dump_var('moist', moist(it,kts,jt,:)); call esm_dump_var('chem', chem(it,kts,jt,:))
+	    call esm_dump_var('ltot2', ltot2); call esm_dump_var('ktemp', ktemp)
+	    do esm_l = 1, ltot2
+	        write(esm_tag,'(a,i4.4)') 'name_', esm_l
+	        call esm_dump_var(trim(esm_tag), trim(name(esm_l)))
+	    end do
+	    call esm_dump_var('cairclm', cairclm(1)); call esm_dump_var('rsub', rsub(1:ltot2,1,1))
+	    call esm_dump_var('nsize_aer', nsize_aer(1)); call esm_dump_var('ncomp_aer', ncomp_aer(1))
+	    call esm_dump_var('dcen_sect', dcen_sect(1:nsize_aer(1),1))
+	    call esm_dump_var('dlo_sect', dlo_sect(1:nsize_aer(1),1)); call esm_dump_var('dhi_sect', dhi_sect(1:nsize_aer(1),1))
+	    call esm_dump_var('volumlo_sect', volumlo_sect(1:nsize_aer(1),1))
+	    call esm_dump_var('volumhi_sect', volumhi_sect(1:nsize_aer(1),1))
+	    call esm_dump_var('dens_aer', dens_aer(1:ncomp_aer(1),1)); call esm_dump_var('mw_aer', mw_aer(1:ncomp_aer(1),1))
+	    call esm_dump_var('massptr_aer', massptr_aer(1:ncomp_aer(1),1:nsize_aer(1),1,1))
+	    call esm_dump_var('waterptr_aer', waterptr_aer(1:nsize_aer(1),1))
+	    call esm_dump_var('numptr_aer', numptr_aer(1:nsize_aer(1),1,1))
+	    call esm_dump_var('mw_water_aer', mw_water_aer); call esm_dump_var('dens_water_aer', dens_water_aer)
+	    call esm_dump_var('vdep_aer', vdep_aer(1:nsize_aer(1),1,1))
+	end if
 
 
 ! rce 23-nov-2004 - change to using the "..._aer" species pointers
@@ -210,6 +241,10 @@
 	end do
 	end do
 	end do
+	if (esm_dumping .and. (it == its) .and. (jt == jts)) then
+	    call esm_dump_var('ddvel', ddvel(it,jt,:))
+	    call esm_dump_close()
+	end if
 
 
 2910	continue

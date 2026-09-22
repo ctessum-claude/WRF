@@ -14,7 +14,7 @@ B = build
 P = ../phys
 M = ../phys/physics_mmm
 
-DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver
+DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/ntiedtke_driver $(B)/noah_driver
 all: $(DRIVERS)
 
 $(B):
@@ -41,8 +41,23 @@ $(B)/mp_radar.o: $(M)/mp_radar.F90 $(B)/ccpp_kind_types.o
 $(B)/mp_wsm6.o: $(M)/mp_wsm6.F90 $(B)/ccpp_kind_types.o $(B)/module_libmassv.o $(B)/mp_radar.o $(B)/module_esm_dump.o
 	$(FC) $(FFLAGS) -DESM_DUMP -J$(B) -I$(B) -c $< -o $@
 
+# New Tiedtke: a build-time copy of the kernel with ntiedtke_esm_inner.inc
+# spliced in after the cumastrn call (the physics_mmm source stays untouched)
+$(B)/cu_ntiedtke_esm.F90: $(M)/cu_ntiedtke.F90 ntiedtke_esm_inner.inc | $(B)
+	sed -e 's/^ *use cu_ntiedtke_common$$/&\n use module_esm_dump/' \
+	    -e '/^     &     scale_fac, scale_fac2)$$/{n;s/^!$$/#include "ntiedtke_esm_inner.inc"\n!/}' $< > $@
+	grep -q 'ntiedtke_esm_inner.inc' $@
+$(B)/cu_ntiedtke.o: $(B)/cu_ntiedtke_esm.F90 $(B)/ccpp_kind_types.o $(B)/module_esm_dump.o
+	$(FC) $(FFLAGS) -I. -J$(B) -I$(B) -c $< -o $@
+
 # WRF-native modules (default REAL): promoted in the real64 build
 $(B)/module_ra_sw.o: $(P)/module_ra_sw.F $(B)/module_esm_dump.o
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
+$(B)/module_model_constants.o: ../share/module_model_constants.F | $(B)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $< -o $@
+$(B)/stub_wrf_error.o: stub_wrf_error.F90 | $(B)
+	$(FC) $(FFLAGS) -J$(B) -c $< -o $@
+$(B)/module_sf_noahlsm.o: $(P)/module_sf_noahlsm.F $(B)/module_model_constants.o $(B)/stub_wrf_error.o
 	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
 $(B)/module_sf_slab.o: $(P)/module_sf_slab.F $(B)/module_esm_dump.o
 	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
@@ -56,6 +71,12 @@ $(B)/wsm6_driver: wsm6_driver.F90 $(COMMON) $(B)/module_libmassv.o $(B)/mp_radar
 $(B)/sw_driver: sw_driver.F90 $(COMMON) $(B)/module_ra_sw.o
 	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
 $(B)/slab_driver: slab_driver.F90 $(COMMON) $(B)/module_sf_slab.o
+	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
+
+$(B)/ntiedtke_driver: ntiedtke_driver.F90 $(COMMON) $(B)/cu_ntiedtke.o
+	$(FC) $(FFLAGS) -I$(B) -J$(B) $^ -o $@
+
+$(B)/noah_driver: noah_driver.F90 $(COMMON) $(B)/module_model_constants.o $(B)/stub_wrf_error.o $(B)/module_sf_noahlsm.o
 	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
 
 clean:

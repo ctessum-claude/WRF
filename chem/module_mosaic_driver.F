@@ -158,6 +158,7 @@
 	use module_mosaic_newnuc, only:  mosaic_newnuc_1clm
 	use module_mosaic_coag, only:  mosaic_coag_1clm
 	use module_peg_util, only:  peg_error_fatal, peg_message
+	use module_esm_dump, only:  esm_dump_want, esm_dump_open, esm_dump_var, esm_dump_close
 
         use module_data_mosaic_therm, only: glysoa_param,                 &
                glysoa_param_off, glysoa_param_simple, glysoa_param_complex
@@ -263,6 +264,11 @@
 	real :: rsub0(l2maxd,kmaxd,nsubareamaxd)
 
 	character*100 msg
+
+!   EarthSciML instrumentation: column (its, jts) through each MOSAIC stage
+	logical :: esm_dumping, esm_col
+	integer :: esm_l
+	character(len=16) :: esm_tag
 
 
         if ( config_flags%aerchem_onoff <= 0 ) return   ! aerosol chem/dynam turned off
@@ -396,11 +402,13 @@
 	call print_mosaic_stats( 0 )
 
 
+	esm_dumping = esm_dump_want('mosaic')
 	do 2920 jt = jts, jte
 	do 2910 it = its, ite
 
 	ijcount_dum = ijcount_dum + 1
 	dtchem = dtstepc
+	esm_col = esm_dumping .and. (it == its) .and. (jt == jts)
 
 
 !   mode_force_dump selects a detailed dump of gaschem at either
@@ -416,6 +424,20 @@
 !	end if
 
 
+	if (esm_col) then
+	    call esm_dump_open('mosaic')
+	    call esm_dump_var('it', it); call esm_dump_var('jt', jt)
+	    call esm_dump_var('kts', kts); call esm_dump_var('kte', kte)
+	    call esm_dump_var('ktau', ktau); call esm_dump_var('ktauc', ktauc)
+	    call esm_dump_var('dtstep', dtstep); call esm_dump_var('dtchem', dtchem)
+	    call esm_dump_var('curr_secs', curr_secs)
+	    call esm_dump_var('aernewnuc_onoff', aernewnuc_onoff); call esm_dump_var('aercoag_onoff', aercoag_onoff)
+	    call esm_dump_var('msectional', msectional)
+	    call esm_dump_var('mosaic_aerchem_optaa', config_flags%mosaic_aerchem_optaa)
+	    call esm_dump_var('t_phy', t_phy(it,kts:kte,jt)); call esm_dump_var('p_phy', p_phy(it,kts:kte,jt))
+	    call esm_dump_var('rho_phy', rho_phy(it,kts:kte,jt))
+	    call esm_dump_var('moist_in', moist(it,kts:kte,jt,:)); call esm_dump_var('chem_in', chem(it,kts:kte,jt,:))
+	end if
 !	print 93010, 'calling mapaeraa - it, jt =', it, jt
 	call mapaer_tofrom_host( 0,                       &
 		ims,ime, jms,jme, kms,kme,                    &
@@ -426,6 +448,20 @@
 
 !rce 22-jul-2006 - save initial mixrats
 	rsub0(:,:,:) = rsub(:,:,:)
+	if (esm_col) then
+	    call esm_dump_var('ltot2', ltot2); call esm_dump_var('kclm_calcbgn', kclm_calcbgn)
+	    call esm_dump_var('kclm_calcend', kclm_calcend)
+	    call esm_dump_var('ktemp', ktemp); call esm_dump_var('kh2o', kh2o)
+	    do esm_l = 1, ltot2
+	        write(esm_tag,'(a,i4.4)') 'name_', esm_l
+	        call esm_dump_var(trim(esm_tag), trim(name(esm_l)))
+	    end do
+	    call esm_dump_var('cairclm', cairclm(kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('ptotclm', ptotclm(kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('relhumclm', relhumclm(kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('afracsubarea', afracsubarea(kclm_calcbgn:kclm_calcend,1))
+	    call esm_dump_var('rsub_in', rsub(1:ltot2,kclm_calcbgn:kclm_calcend,1))
+	end if
 
 	idiagaa_dum = 0
 	idiagbb_dum = 110
@@ -463,6 +499,7 @@
 !  note units for aerosol is now ug/m3
 
     call wrf_debug(300,"mosaic_aerchem_driver: back from aerchemistry")
+	if (esm_col) call esm_dump_var('rsub_therm', rsub(1:ltot2,kclm_calcbgn:kclm_calcend,1))
 !	if ((it .eq.45) .and. (jt .eq.71)   &
 !			.and. (ktau.eq.240)) then
 !	    call aerchem_debug_dump( 3, it, jt, dtchem )
@@ -479,6 +516,7 @@
 		idiagbb_dum, dtchem, dtnuc, rsub0,   &
 		id, ktau, ktauc, its, ite, jts, jte, kts, kte )
 	end if
+	if (esm_col) call esm_dump_var('rsub_newnuc', rsub(1:ltot2,kclm_calcbgn:kclm_calcend,1))
 
 
 	if (aercoag_onoff > 0) then
@@ -489,6 +527,7 @@
 		idiagbb_dum, dtchem, dtcoag,   &
 		id, ktau, ktauc, its, ite, jts, jte, kts, kte )
 	end if
+	if (esm_col) call esm_dump_var('rsub_coag', rsub(1:ltot2,kclm_calcbgn:kclm_calcend,1))
 
 
 	if (idiagaa_dum > 0)   &
@@ -499,6 +538,10 @@
 		it,      jt,      ktmaps,ktmape,              &
 		num_moist, num_chem, moist, chem,             &
 		t_phy, p_phy, rho_phy                         )
+	if (esm_col) then
+	    call esm_dump_var('moist_out', moist(it,kts:kte,jt,:)); call esm_dump_var('chem_out', chem(it,kts:kte,jt,:))
+	    call esm_dump_close()
+	end if
 
 !	print 93010, 'backfrm mapaerbb', it, jt
 2910	continue
