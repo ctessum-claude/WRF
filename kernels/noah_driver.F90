@@ -119,5 +119,13 @@ program noah_driver
   call esm_dump_var('smav', smav); call esm_dump_var('snotime1_out', snotime1)
   call esm_dump_var('smcwlt', smcwlt); call esm_dump_var('smcdry', smcdry); call esm_dump_var('smcref', smcref)
   call esm_dump_var('smcmax', smcmax); call esm_dump_var('nroot', nroot)
+  ! SFLX/NOPAC internals published by the noah_esm_*.inc splices (see the Makefile):
+  ! the soil thermal conductivity of the top layer, the surface-energy-balance closure
+  ! pair yy/zz1, and the linearised Penman quantities, none of which WRF stores.
+  call esm_dump_var('df1', ESM_DF1); call esm_dump_var('yy', ESM_YY)
+  call esm_dump_var('zz1', ESM_ZZ1); call esm_dump_var('ssoil_pre', ESM_SSOIL_PRE)
+  call esm_dump_var('rch', ESM_RCH); call esm_dump_var('rr', ESM_RR)
+  call esm_dump_var('epsca', ESM_EPSCA); call esm_dump_var('t24', ESM_T24)
+  call esm_dump_var('fdown_pen', ESM_FDOWN)
   call esm_dump_close()
 end program noah_driver

@@ -57,8 +57,16 @@ $(B)/module_model_constants.o: ../share/module_model_constants.F | $(B)
 	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $< -o $@
 $(B)/stub_wrf_error.o: stub_wrf_error.F90 | $(B)
 	$(FC) $(FFLAGS) -J$(B) -c $< -o $@
-$(B)/module_sf_noahlsm.o: $(P)/module_sf_noahlsm.F $(B)/module_model_constants.o $(B)/stub_wrf_error.o
-	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
+# Noah: a build-time copy of the module with the three noah_esm_*.inc splices,
+# publishing SFLX's and NOPAC's internal DF1/YY/ZZ1 and linearised-Penman
+# quantities as module variables (the phys source stays untouched)
+$(B)/module_sf_noahlsm_esm.F: $(P)/module_sf_noahlsm.F noah_esm_state.inc noah_esm_penman.inc noah_esm_nopac.inc | $(B)
+	sed -e 's|^CONTAINS$$|#include "noah_esm_state.inc"\n&|' \
+	    -e 's|^\t\t       ALBEDO,SOLDN,FVB,GAMA,STC(1),ETPN,FLX4,UA_PHYS)$$|&\n#include "noah_esm_penman.inc"|' \
+	    -e 's|^      ZZ1 = DF1 / ( -0.5 \* ZSOIL (1) \* RCH \* RR ) + 1.0$$|&\n#include "noah_esm_nopac.inc"|' $< > $@
+	grep -q 'noah_esm_state.inc' $@ && grep -q 'noah_esm_penman.inc' $@ && grep -q 'noah_esm_nopac.inc' $@
+$(B)/module_sf_noahlsm.o: $(B)/module_sf_noahlsm_esm.F $(B)/module_model_constants.o $(B)/stub_wrf_error.o
+	$(FC) $(FFLAGS) $(PROMO) -I. -J$(B) -I$(B) -c $< -o $@
 $(B)/module_sf_slab.o: $(P)/module_sf_slab.F $(B)/module_esm_dump.o
 	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
 
