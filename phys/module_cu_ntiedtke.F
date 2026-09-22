@@ -5,6 +5,7 @@
  use cu_ntiedtke,only: cu_ntiedtke_run, &
                        cu_ntiedtke_init
  use cu_ntiedtke_common
+ use module_esm_dump
 
  implicit none
  private
@@ -151,6 +152,7 @@
  real(kind=kind_phys),dimension(its:ite):: raincv_hv,pratec_hv
  real(kind=kind_phys),dimension(its:ite,kts:kte):: rthcuten_hv,rqvcuten_hv,rqccuten_hv,rqicuten_hv, &
                                                    rucuten_hv,rvcuten_hv
+ logical:: esm_dumping
 
 !-----------------------------------------------------------------------------------------------------------------
 
@@ -202,6 +204,30 @@
        enddo
     enddo
 
+    ! EarthSciML instrumentation (module_esm_dump): the driver-level row inputs,
+    ! the flipped kernel-boundary arrays cu_ntiedtke_pre_run builds, the kernel's
+    ! outputs, and the tendencies cu_ntiedtke_post_run forms from them.
+    ! Selected by ESM_DUMP=ntiedtke, ESM_DUMP_STEPS and ESM_DUMP_J.
+    esm_dumping = esm_dump_want_at('ntiedtke', itimestep, j)
+    if (esm_dumping) then
+       call esm_dump_open_at('ntiedtke', itimestep, j, its)
+       call esm_dump_var('itimestep', itimestep); call esm_dump_var('stepcu', stepcu); call esm_dump_var('j', j)
+       call esm_dump_var('its', its); call esm_dump_var('ite', ite)
+       call esm_dump_var('kts', kts); call esm_dump_var('kte', kte)
+       call esm_dump_var('dt', dt)
+       call esm_dump_var('cp', cp); call esm_dump_var('rd', rd); call esm_dump_var('rv', rv)
+       call esm_dump_var('xlv', xlv); call esm_dump_var('xls', xls); call esm_dump_var('xlf', xlf)
+       call esm_dump_var('grav', grav)
+       call esm_dump_var('dx', dx_hv); call esm_dump_var('hfx', hfx_hv); call esm_dump_var('qfx', qfx_hv)
+       call esm_dump_var('xland', xland_hv)
+       call esm_dump_var('dz8w', dz_hv); call esm_dump_var('pi3d', pi_hv); call esm_dump_var('pcps', prsl_hv)
+       call esm_dump_var('qv3d', qv_hv); call esm_dump_var('qc3d', qc_hv); call esm_dump_var('qi3d', qi_hv)
+       call esm_dump_var('rho3d', rho_hv); call esm_dump_var('t3d', t_hv)
+       call esm_dump_var('u3d', u_hv); call esm_dump_var('v3d', v_hv)
+       call esm_dump_var('qvften', qvften_hv); call esm_dump_var('thften', thften_hv)
+       call esm_dump_var('p8w', prsi_hv); call esm_dump_var('w', w_hv)
+    end if
+
     call cu_ntiedtke_pre_run( &
                      its    = its       , ite     = ite     , kts     = kts     , kte       = kte       , &
                      im     = im        , kx      = kx      , kx1     = kx1     , itimestep = itimestep , &
@@ -215,6 +241,15 @@
                      vf     = vf        , prsi    = prsi    , ghti    = ghti    , omg       = omg       , &
                      errmsg = errmsg    , errflg  = errflg                                                &
                             )
+
+    if (esm_dumping) then
+       call esm_dump_var('k_delt', delt); call esm_dump_var('k_slimsk', slimsk)
+       call esm_dump_var('k_pu', uf); call esm_dump_var('k_pv', vf); call esm_dump_var('k_pt', tf)
+       call esm_dump_var('k_pqv', qvf); call esm_dump_var('k_pqc', qcf); call esm_dump_var('k_pqi', qif)
+       call esm_dump_var('k_pqvf', qvftenz); call esm_dump_var('k_ptf', thftenz)
+       call esm_dump_var('k_poz', ghtl); call esm_dump_var('k_pzz', ghti); call esm_dump_var('k_pomg', omg)
+       call esm_dump_var('k_pap', prsl); call esm_dump_var('k_paph', prsi)
+    end if
 
     call cu_ntiedtke_run( &
                      pu   = uf     , pv   = vf     , pt     = tf      , pqv    = qvf     , &
@@ -235,6 +270,18 @@
                      rqccuten = rqccuten_hv , rqicuten = rqicuten_hv , rucuten  = rucuten_hv  , rvcuten  = rvcuten_hv  , &
                      errmsg   = errmsg      , errflg   = errflg                                                          &
                              )
+
+    if (esm_dumping) then
+       call esm_dump_var('k_pu_out', uf); call esm_dump_var('k_pv_out', vf); call esm_dump_var('k_pt_out', tf)
+       call esm_dump_var('k_pqv_out', qvf); call esm_dump_var('k_pqc_out', qcf); call esm_dump_var('k_pqi_out', qif)
+       call esm_dump_var('k_zprecc', rn)
+       call esm_dump_var('raincv', raincv_hv); call esm_dump_var('pratec', pratec_hv)
+       call esm_dump_var('rthcuten', rthcuten_hv); call esm_dump_var('rqvcuten', rqvcuten_hv)
+       call esm_dump_var('rqccuten', rqccuten_hv); call esm_dump_var('rqicuten', rqicuten_hv)
+       call esm_dump_var('rucuten', rucuten_hv); call esm_dump_var('rvcuten', rvcuten_hv)
+       call esm_dump_var('errflg', errflg)
+       call esm_dump_close()
+    end if
 
     do i = its,ite
        raincv(i,j) = raincv_hv(i)

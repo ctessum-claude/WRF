@@ -14,7 +14,7 @@ B = build
 P = ../phys
 M = ../phys/physics_mmm
 
-DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/solar_driver $(B)/cldfra_driver
+DRIVERS = $(B)/gwdo_driver $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/solar_driver $(B)/cldfra_driver
 all: $(DRIVERS)
 
 $(B):
@@ -34,6 +34,8 @@ $(B)/bl_ysu.o: $(M)/bl_ysu.F90 $(B)/ccpp_kind_types.o
 	$(FC) $(FFLAGS) -J$(B) -I$(B) -c $< -o $@
 $(B)/sf_sfclayrev.o: $(M)/sf_sfclayrev.F90 $(B)/ccpp_kind_types.o
 	$(FC) $(FFLAGS) -J$(B) -I$(B) -c $< -o $@
+$(B)/bl_gwdo.o: $(M)/bl_gwdo.F90 $(B)/ccpp_kind_types.o
+	$(FC) $(FFLAGS) -J$(B) -I$(B) -c $< -o $@
 $(B)/module_libmassv.o: $(M)/module_libmassv.F90 $(B)/ccpp_kind_types.o
 	$(FC) $(FFLAGS) -J$(B) -I$(B) -c $< -o $@
 $(B)/mp_radar.o: $(M)/mp_radar.F90 $(B)/ccpp_kind_types.o
@@ -48,6 +50,8 @@ $(B)/module_sf_slab.o: $(P)/module_sf_slab.F $(B)/module_esm_dump.o
 	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
 
 $(B)/ysu_driver: ysu_driver.F90 $(COMMON) $(B)/bl_ysu.o
+	$(FC) $(FFLAGS) -I$(B) -J$(B) $^ -o $@
+$(B)/gwdo_driver: gwdo_driver.F90 $(COMMON) $(B)/bl_gwdo.o
 	$(FC) $(FFLAGS) -I$(B) -J$(B) $^ -o $@
 $(B)/sfclayrev_driver: sfclayrev_driver.F90 $(COMMON) $(B)/sf_sfclayrev.o
 	$(FC) $(FFLAGS) -I$(B) -J$(B) $^ -o $@

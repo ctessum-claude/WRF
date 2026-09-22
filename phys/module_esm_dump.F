@@ -24,6 +24,17 @@
 !   ESM_DUMP_CALLS comma-separated 1-based call indices per scheme to dump
 !                  (default "1"); every call increments the scheme's counter.
 !   ESM_DUMP_DIR   output directory (default ".")
+! Positional selection, for 3-D (real-data, MPI) runs, where a per-rank call
+! counter names nothing reproducible and ranks would overwrite each other's
+! files (branch earthsciml-instrumented-gwdo):
+!   esm_dump_want_at(scheme, itimestep, j)  scheme in ESM_DUMP, itimestep in
+!                  ESM_DUMP_STEPS and global row j in ESM_DUMP_J (all three
+!                  required; "all" matches anything)
+!   esm_dump_want_i(i)  global column i in ESM_DUMP_I_LIST (point schemes)
+!   esm_dump_open_at(scheme, itimestep, j, i) writes
+!                  <dir>/esm_dump_<scheme>_s<itimestep>_j<j>_i<i>.json, where i
+!                  is the tile's its for a row dump and the point for a column
+!                  dump, so the name is unique across MPI ranks.
 ! One file per dumped call: <dir>/esm_dump_<scheme>_<call>.json with
 !   {"scheme": "...", "call": n, "vars": {"name": {"kind": ..., "shape": [..],
 !    "data": [...]}, ...}}
@@ -36,6 +47,7 @@ module module_esm_dump
   private
   public :: esm_dump_want, esm_dump_open, esm_dump_open_file, esm_dump_close, esm_dump_var
   public :: esm_dump_active, esm_dump_inner, esm_dump_col
+  public :: esm_dump_want_at, esm_dump_want_i, esm_dump_open_at
 
   ! esm_dump_inner: set by a wrapper (or driver) to let dump calls placed
   ! INSIDE a kernel (sub-process diagnostics) append to the open file.  The
@@ -109,6 +121,38 @@ contains
       cur_call = scheme_calls(is)
     end if
   end function esm_dump_want
+
+  logical function esm_dump_want_at(scheme, itimestep, j) result(want)
+    character(len=*), intent(in) :: scheme
+    integer, intent(in) :: itimestep, j
+    character(len=16) :: s
+    want = .false.
+    if (.not. env_list_has('ESM_DUMP', scheme, '')) return
+    write(s, '(I0)') itimestep
+    if (.not. env_list_has('ESM_DUMP_STEPS', trim(s), '')) return
+    write(s, '(I0)') j
+    want = env_list_has('ESM_DUMP_J', trim(s), '')
+  end function esm_dump_want_at
+
+  logical function esm_dump_want_i(i) result(want)
+    integer, intent(in) :: i
+    character(len=16) :: s
+    write(s, '(I0)') i
+    want = env_list_has('ESM_DUMP_I_LIST', trim(s), '')
+  end function esm_dump_want_i
+
+  subroutine esm_dump_open_at(scheme, itimestep, j, i)
+    character(len=*), intent(in) :: scheme
+    integer, intent(in) :: itimestep, j, i
+    character(len=1024) :: dir, fname
+    integer :: stat
+    call get_environment_variable('ESM_DUMP_DIR', dir, status=stat)
+    if (stat /= 0 .or. len_trim(dir) == 0) dir = '.'
+    write(fname, '(A,"/esm_dump_",A,"_s",I0,"_j",I0,"_i",I0,".json")') trim(dir), trim(scheme), itimestep, j, i
+    open(newunit=unit, file=trim(fname), status='replace', action='write')
+    write(unit, '(A,A,A,I0,A)') '{"scheme": "', trim(scheme), '", "call": ', itimestep, ', "vars": {'
+    first_var = .true.
+  end subroutine esm_dump_open_at
 
   subroutine esm_dump_open(scheme)
     character(len=*), intent(in) :: scheme

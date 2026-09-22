@@ -3,6 +3,7 @@
  use ccpp_kind_types,only: kind_phys
 
  use bl_gwdo,only: bl_gwdo_run
+ use module_esm_dump
 
 
  implicit none
@@ -144,6 +145,7 @@
 
  real(kind=kind_phys),dimension(its:ite,kms:kme):: &
      p3di_hv
+ logical:: esm_dumping
 
 !-----------------------------------------------------------------------------------------------------------------
 
@@ -202,6 +204,34 @@
        elvmax_hv(i) =elvmax(i,j)
     enddo
 
+    ! EarthSciML instrumentation (module_esm_dump): every bl_gwdo_run input for
+    ! this tile row before the call, every output after it (rublten/rvblten are
+    ! INOUT: the PBL tendency in, PBL + GWDO out). Selected by ESM_DUMP=gwdo,
+    ! ESM_DUMP_STEPS and ESM_DUMP_J (global indices).
+    esm_dumping = esm_dump_want_at('gwdo', itimestep, j)
+    if (esm_dumping) then
+       call esm_dump_open_at('gwdo', itimestep, j, its)
+       call esm_dump_var('itimestep', itimestep); call esm_dump_var('j', j)
+       call esm_dump_var('its', its); call esm_dump_var('ite', ite)
+       call esm_dump_var('kts', kts); call esm_dump_var('kte', kte); call esm_dump_var('kme', kte+1)
+       call esm_dump_var('dt', dt); call esm_dump_var('dx_factor', dx_factor)
+       call esm_dump_var('if_nonhyd', if_nonhyd)
+       call esm_dump_var('g', g); call esm_dump_var('cp', cp); call esm_dump_var('rd', rd)
+       call esm_dump_var('rv', rv); call esm_dump_var('ep1', ep1); call esm_dump_var('pi', pi)
+       call esm_dump_var('sina', sina_hv); call esm_dump_var('cosa', cosa_hv)
+       call esm_dump_var('rublten_in', rublten_hv); call esm_dump_var('rvblten_in', rvblten_hv)
+       call esm_dump_var('uproj', u3d_hv); call esm_dump_var('vproj', v3d_hv)
+       call esm_dump_var('t1', t3d_hv); call esm_dump_var('q1', qv3d_hv)
+       call esm_dump_var('prsi', p3di_hv(:,kts:kte+1)); call esm_dump_var('prsl', p3d_hv)
+       call esm_dump_var('prslk', pi3d_hv); call esm_dump_var('zl', z_hv)
+       call esm_dump_var('var', var2d_hv); call esm_dump_var('oc1', oc12d_hv)
+       call esm_dump_var('oa2d1', oa2d1_hv); call esm_dump_var('oa2d2', oa2d2_hv)
+       call esm_dump_var('oa2d3', oa2d3_hv); call esm_dump_var('oa2d4', oa2d4_hv)
+       call esm_dump_var('ol2d1', ol2d1_hv); call esm_dump_var('ol2d2', ol2d2_hv)
+       call esm_dump_var('ol2d3', ol2d3_hv); call esm_dump_var('ol2d4', ol2d4_hv)
+       call esm_dump_var('omax', elvmax_hv); call esm_dump_var('dxmeter', dx_hv)
+    end if
+
     call bl_gwdo_run(sina=sina_hv,cosa=cosa_hv                &
                     ,rublten=rublten_hv,rvblten=rvblten_hv    &
                     ,dtaux3d=dtaux3d_hv,dtauy3d=dtauy3d_hv    &
@@ -222,6 +252,14 @@
                     ,dxmeter=dx_hv,deltim=dt                  &
                     ,its=its,ite=ite,kte=kte,kme=kte+1        &
                     ,errmsg=errmsg,errflg=errflg)
+
+    if (esm_dumping) then
+       call esm_dump_var('rublten', rublten_hv); call esm_dump_var('rvblten', rvblten_hv)
+       call esm_dump_var('dtaux3d', dtaux3d_hv); call esm_dump_var('dtauy3d', dtauy3d_hv)
+       call esm_dump_var('dusfcg', dusfcg_hv); call esm_dump_var('dvsfcg', dvsfcg_hv)
+       call esm_dump_var('errflg', errflg)
+       call esm_dump_close()
+    end if
 
     !  Variables that are INTENT(OUT) or INTENT(INOUT):
 

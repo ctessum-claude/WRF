@@ -678,6 +678,7 @@ module_bl_mynnedmf_driver.o: \
 
 
 module_bl_gwdo.o: \
+	module_esm_dump.o \
 	physics_mmm/bl_gwdo.o
 
 
@@ -935,6 +936,7 @@ module_cu_tiedtke.o: \
 
 
 module_cu_ntiedtke.o: \
+	module_esm_dump.o \
 	../share/module_model_constants.o \
 	ccpp_kind_types.o \
 	physics_mmm/cu_ntiedtke.o
@@ -1131,6 +1133,7 @@ module_sf_gfs.o: \
 
 
 module_sf_noahdrv.o: \
+	module_esm_dump.o \
 	module_ra_gfdleta.o \
 	../frame/module_wrf_error.o \
 	module_sf_noahlsm.o \

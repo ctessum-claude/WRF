@@ -1,6 +1,7 @@
 MODULE module_sf_noahdrv
 
 !-------------------------------
+  USE module_esm_dump
   USE module_sf_noahlsm,  only: SFLX, XLF, XLV, CP, R_D, RHOWATER, NATURAL, SHDTBL, LUTYPE, SLTYPE, STBOLT, &
       &                         KARMAN, LUCATS, NROTBL, RSTBL, RGLTBL, HSTBL, SNUPTBL, MAXALB, LAIMINTBL,   &
       &                         LAIMAXTBL, Z0MINTBL, Z0MAXTBL, ALBEDOMINTBL, ALBEDOMAXTBL, EMISSMINTBL,     &
@@ -732,6 +733,7 @@ CONTAINS
    REAL                    ::  HFX_PHY, QFX_PHY
    REAL                    ::  DZQ
    REAL                    ::  HCPCT_FASDAS
+   LOGICAL                 ::  esm_dumping_row, esm_dumping
 
    REAL,OPTIONAL,INTENT(IN),DIMENSION( ims:ime, jms:jme )       :: IRR_CHAN
    REAL       ::  IRRIGATION_CHANNEL
@@ -765,6 +767,10 @@ CONTAINS
      ENDDO
 
      JLOOP : DO J=jts,jte
+      ! EarthSciML instrumentation (module_esm_dump): SFLX in/out for the points
+      ! (ESM_DUMP_I_LIST) on the rows (ESM_DUMP_J) of the steps (ESM_DUMP_STEPS)
+      ! selected with ESM_DUMP=noah.
+      esm_dumping_row = esm_dump_want_at('noah', itimestep, j)
 
       IF(ITIMESTEP.EQ.1)THEN
         DO 50 I=its,ite
@@ -1122,6 +1128,30 @@ CONTAINS
        sfcheadrt_hydro = 0.
        infxsrt_hydro = 0.
 #endif
+       esm_dumping = esm_dumping_row
+       if (esm_dumping) esm_dumping = esm_dump_want_i(i)
+       if (esm_dumping) then
+          call esm_dump_open_at('noah', itimestep, j, i)
+          call esm_dump_var('itimestep', itimestep); call esm_dump_var('i', i); call esm_dump_var('j', j)
+          call esm_dump_var('ffrozp', ffrozp); call esm_dump_var('isurban', isurban); call esm_dump_var('dt', dt)
+          call esm_dump_var('zlvl', zlvl); call esm_dump_var('nsoil', nsoil); call esm_dump_var('sldpth', sldpth)
+          call esm_dump_var('local', local); call esm_dump_var('lutype', lutype); call esm_dump_var('sltype', sltype)
+          call esm_dump_var('lwdn', lwdn); call esm_dump_var('soldn', soldn); call esm_dump_var('solnet', solnet)
+          call esm_dump_var('sfcprs', sfcprs); call esm_dump_var('prcp', prcp); call esm_dump_var('sfctmp', sfctmp)
+          call esm_dump_var('q2', q2k); call esm_dump_var('th2', th2); call esm_dump_var('q2sat', q2sat)
+          call esm_dump_var('dqsdt2', dqsdt2); call esm_dump_var('vegtyp', vegtyp); call esm_dump_var('soiltyp', soiltyp)
+          call esm_dump_var('slopetyp', slopetyp); call esm_dump_var('shdfac', shdfac); call esm_dump_var('shdmin', shmin)
+          call esm_dump_var('shdmax', shmax); call esm_dump_var('alb', albbrd); call esm_dump_var('snoalb', snoalb1)
+          call esm_dump_var('tbot', tbot); call esm_dump_var('z0brd_in', z0brd); call esm_dump_var('z0_in', z0k)
+          call esm_dump_var('emissi_in', emissi); call esm_dump_var('embrd_in', embrd)
+          call esm_dump_var('cmc_in', cmc); call esm_dump_var('t1_in', t1); call esm_dump_var('stc_in', stc)
+          call esm_dump_var('smc_in', smc); call esm_dump_var('sh2o_in', swc); call esm_dump_var('snowh_in', snowhk)
+          call esm_dump_var('sneqv_in', sneqv); call esm_dump_var('albedo_in', albedok); call esm_dump_var('ch_in', chk)
+          call esm_dump_var('ua_phys', ua_phys); call esm_dump_var('rdlai2d', rdlai2d); call esm_dump_var('usemonalb', usemonalb)
+          call esm_dump_var('xlai_in', xlai); call esm_dump_var('snotime1_in', snotime1); call esm_dump_var('ribb', ribb)
+          call esm_dump_var('opt_thcnd', opt_thcnd); call esm_dump_var('aoasis', aoasis); call esm_dump_var('fasdas', fasdas)
+          call esm_dump_var('irrigation_channel', irrigation_channel)
+       end if
        CALL SFLX (I,J,FFROZP, ISURBAN, DT,ZLVL,NSOIL,SLDPTH,       &    !C
                  LOCAL,                                            &    !L
                  LUTYPE, SLTYPE,                                   &    !CL
@@ -1150,6 +1180,29 @@ CONTAINS
                 ,OPT_THCND,AOASIS                                  &    !O
                 ,XSDA_QFX, HFX_PHY, QFX_PHY, XQNORM, fasdas, HCPCT_FASDAS    &   ! fasdas
                 ,IRRIGATION_CHANNEL)
+       if (esm_dumping) then
+          call esm_dump_var('z0brd', z0brd); call esm_dump_var('z0', z0k); call esm_dump_var('emissi', emissi)
+          call esm_dump_var('embrd', embrd); call esm_dump_var('cmc', cmc); call esm_dump_var('t1', t1)
+          call esm_dump_var('stc', stc); call esm_dump_var('smc', smc); call esm_dump_var('sh2o', swc)
+          call esm_dump_var('snowh', snowhk); call esm_dump_var('sneqv', sneqv); call esm_dump_var('albedo', albedok)
+          call esm_dump_var('ch', chk)
+          call esm_dump_var('eta', eta); call esm_dump_var('sheat', sheat); call esm_dump_var('eta_kinematic', eta_kinematic)
+          call esm_dump_var('fdown', fdown); call esm_dump_var('ec', ec); call esm_dump_var('edir', edir)
+          call esm_dump_var('et', et); call esm_dump_var('ett', ett); call esm_dump_var('esnow', esnow)
+          call esm_dump_var('drip', drip); call esm_dump_var('dew', dew); call esm_dump_var('beta', beta)
+          call esm_dump_var('etp', etp); call esm_dump_var('ssoil', ssoil)
+          call esm_dump_var('flx1', flx1); call esm_dump_var('flx2', flx2); call esm_dump_var('flx3', flx3)
+          call esm_dump_var('snomlt', snomlt); call esm_dump_var('sncovr', sncovr)
+          call esm_dump_var('runoff1', runoff1); call esm_dump_var('runoff2', runoff2); call esm_dump_var('runoff3', runoff3)
+          call esm_dump_var('rc', rc); call esm_dump_var('pc', pc); call esm_dump_var('rsmin', rsmin)
+          call esm_dump_var('xlai', xlai); call esm_dump_var('rcs', rcs); call esm_dump_var('rct', rct)
+          call esm_dump_var('rcq', rcq); call esm_dump_var('rcsoil', rcsoil)
+          call esm_dump_var('soilw', soilw); call esm_dump_var('soilm', soilm); call esm_dump_var('q1', q1)
+          call esm_dump_var('smav', smav); call esm_dump_var('snotime1', snotime1)
+          call esm_dump_var('smcwlt', smcwlt); call esm_dump_var('smcdry', smcdry); call esm_dump_var('smcref', smcref)
+          call esm_dump_var('smcmax', smcmax); call esm_dump_var('nroot', nroot)
+          call esm_dump_close()
+       end if
 
 #ifdef WRF_HYDRO
                  soldrain(i,j) = RUNOFF2*DT*1000.0

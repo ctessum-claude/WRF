@@ -1,0 +1,64 @@
+! gwdo_driver: replay one dumped WRF tile row through bl_gwdo_run (real64 when
+! built with -DDOUBLE_PRECISION) and write the outputs as an esm dump.
+!   gwdo_driver <input.flat> <output.json>      env ESM_DT overrides the time step
+! Input is a positional dump from phys/module_bl_gwdo.F (ESM_DUMP=gwdo,
+! ESM_DUMP_STEPS, ESM_DUMP_J), flattened by EqWeFiC tools/esm_dump.py --flat.
+! rublten/rvblten are INOUT: the dumped PBL tendency goes in, PBL + GWDO comes
+! out, so the GWDO tendency is rublten - rublten_in (and dtaux3d, which the
+! scheme writes separately).
+program gwdo_driver
+  use, intrinsic :: iso_fortran_env, only: real64
+  use ccpp_kind_types, only: kind_phys
+  use esm_flat_input
+  use module_esm_dump
+  use bl_gwdo, only: bl_gwdo_run
+  implicit none
+  character(len=1024) :: inpath, outpath, dtstr
+  integer :: its, ite, kts, kte, kme, stat, errflg
+  real(kind_phys) :: dt, dx_factor, g, cp, rd, rv, ep1, pi
+  logical :: if_nonhyd
+  real(kind_phys), allocatable, dimension(:,:) :: rublten, rvblten, dtaux3d, dtauy3d, uproj, vproj, t1, q1, &
+       prsi, prsl, prslk, zl
+  real(kind_phys), allocatable, dimension(:) :: sina, cosa, dusfcg, dvsfcg, var, oc1, oa2d1, oa2d2, oa2d3, oa2d4, &
+       ol2d1, ol2d2, ol2d3, ol2d4, omax, dxmeter
+  character(len=512) :: errmsg
+
+  call get_command_argument(1, inpath); call get_command_argument(2, outpath)
+  call flat_read(trim(inpath))
+  its = flat_i0('its'); ite = flat_i0('ite'); kts = flat_i0('kts'); kte = flat_i0('kte'); kme = flat_i0('kme')
+  dt = flat_r0('dt')
+  call get_environment_variable('ESM_DT', dtstr, status=stat)
+  if (stat == 0 .and. len_trim(dtstr) > 0) read(dtstr, *) dt
+  dx_factor = flat_r0('dx_factor'); if_nonhyd = flat_l0('if_nonhyd')
+  g = flat_r0('g'); cp = flat_r0('cp'); rd = flat_r0('rd'); rv = flat_r0('rv'); ep1 = flat_r0('ep1'); pi = flat_r0('pi')
+
+  allocate(rublten(its:ite,kts:kte), rvblten(its:ite,kts:kte), dtaux3d(its:ite,kts:kte), dtauy3d(its:ite,kts:kte), &
+           uproj(its:ite,kts:kte), vproj(its:ite,kts:kte), t1(its:ite,kts:kte), q1(its:ite,kts:kte), &
+           prsi(its:ite,kts:kme), prsl(its:ite,kts:kte), prslk(its:ite,kts:kte), zl(its:ite,kts:kte))
+  allocate(sina(its:ite), cosa(its:ite), dusfcg(its:ite), dvsfcg(its:ite), var(its:ite), oc1(its:ite), &
+           oa2d1(its:ite), oa2d2(its:ite), oa2d3(its:ite), oa2d4(its:ite), ol2d1(its:ite), ol2d2(its:ite), &
+           ol2d3(its:ite), ol2d4(its:ite), omax(its:ite), dxmeter(its:ite))
+  call flat_r2('rublten_in', rublten); call flat_r2('rvblten_in', rvblten)
+  call flat_r2('uproj', uproj); call flat_r2('vproj', vproj); call flat_r2('t1', t1); call flat_r2('q1', q1)
+  call flat_r2('prsi', prsi); call flat_r2('prsl', prsl); call flat_r2('prslk', prslk); call flat_r2('zl', zl)
+  call flat_r1('sina', sina); call flat_r1('cosa', cosa); call flat_r1('var', var); call flat_r1('oc1', oc1)
+  call flat_r1('oa2d1', oa2d1); call flat_r1('oa2d2', oa2d2); call flat_r1('oa2d3', oa2d3); call flat_r1('oa2d4', oa2d4)
+  call flat_r1('ol2d1', ol2d1); call flat_r1('ol2d2', ol2d2); call flat_r1('ol2d3', ol2d3); call flat_r1('ol2d4', ol2d4)
+  call flat_r1('omax', omax); call flat_r1('dxmeter', dxmeter)
+
+  call bl_gwdo_run(sina=sina,cosa=cosa,rublten=rublten,rvblten=rvblten,dtaux3d=dtaux3d,dtauy3d=dtauy3d, &
+       dusfcg=dusfcg,dvsfcg=dvsfcg,uproj=uproj,vproj=vproj,t1=t1,q1=q1,prsi=prsi,prsl=prsl,prslk=prslk,zl=zl, &
+       var=var,oc1=oc1,oa2d1=oa2d1,oa2d2=oa2d2,oa2d3=oa2d3,oa2d4=oa2d4,ol2d1=ol2d1,ol2d2=ol2d2, &
+       ol2d3=ol2d3,ol2d4=ol2d4,omax=omax,dx_factor=dx_factor,if_nonhyd=if_nonhyd, &
+       g_=g,cp_=cp,rd_=rd,rv_=rv,fv_=ep1,pi_=pi,dxmeter=dxmeter,deltim=dt, &
+       its=its,ite=ite,kte=kte,kme=kme,errmsg=errmsg,errflg=errflg)
+
+  call esm_dump_open_file('gwdo', trim(outpath))
+  call esm_dump_var('its', its); call esm_dump_var('ite', ite); call esm_dump_var('kts', kts); call esm_dump_var('kte', kte)
+  call esm_dump_var('dt', dt); call esm_dump_var('kind_phys_bytes', storage_size(dt)/8)
+  call esm_dump_var('rublten', rublten); call esm_dump_var('rvblten', rvblten)
+  call esm_dump_var('dtaux3d', dtaux3d); call esm_dump_var('dtauy3d', dtauy3d)
+  call esm_dump_var('dusfcg', dusfcg); call esm_dump_var('dvsfcg', dvsfcg)
+  call esm_dump_var('errflg', errflg)
+  call esm_dump_close()
+end program gwdo_driver
