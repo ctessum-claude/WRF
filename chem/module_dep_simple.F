@@ -151,6 +151,10 @@ SUBROUTINE wesely_driver( id, ktau, dtstep, config_flags, current_month,  &
       LOGICAL :: chm_is_moz
 ! EarthSciML instrumentation
       LOGICAL :: esm_dumping
+      INTEGER :: esm_il, esm_is, esm_ic, esm_it, esm_sw_n
+      REAL    :: esm_ta, esm_rmol, esm_ust, esm_ar1, esm_ar2
+      REAL    :: esm_sw_ar(15), esm_sw_us(15), esm_sw_rm(15)
+      REAL, ALLOCATABLE :: esm_sw_rc(:,:), esm_sw_tc(:,:), esm_sw_vd(:,:)
 !--------------------------------------------------
 ! .. Local Arrays
 !--------------------------------------------------
@@ -301,6 +305,81 @@ tile_lon_loop : &
               CALL esm_dump_var('rgso', rgso); CALL esm_dump_var('rcls', rcls)
               CALL esm_dump_var('rclo', rclo)
               CALL esm_dump_close()
+!             ---- regime sweep -------------------------------------------
+!             The reference column only ever visits ONE (iland, iseason) pair
+!             and never wets the surface, so the dumped state above exercises a
+!             single cell of rc().  With ESM_WESELY_SWEEP set, call rc() over
+!             every land-use category, every season and the four wet/rain/
+!             high-NH3 combinations at this column's meteorology, and over a
+!             temperature ladder, and dump the lot; then sweep landusevg over
+!             stability and friction velocity for Ra/Rb/cellvg.
+              IF ( esm_sweep_want() ) THEN
+                CALL esm_dump_open('wesely_sweep')
+                CALL esm_dump_var('numgas', numgas)
+                CALL esm_dump_var('ta', ta);   CALL esm_dump_var('rad', rad)
+                CALL esm_dump_var('rhchem', rhchem); CALL esm_dump_var('pa', pa)
+                CALL esm_dump_var('qv1', moist(i,kts,j,p_qv))
+                CALL esm_dump_var('p8w1', p8w(i,kts,j))
+                CALL esm_dump_var('chem_opt', config_flags%chem_opt)
+                ALLOCATE( esm_sw_rc(numgas, 25*5*4), esm_sw_tc(numgas, 5*4), esm_sw_vd(numgas, 15) )
+                esm_sw_n = 0
+                DO esm_il = 1, 25
+                  DO esm_is = 1, 5
+                    DO esm_ic = 1, 4
+                      esm_sw_n = esm_sw_n + 1
+                      CALL rc( rcx, ta, rad, rhchem, esm_il, esm_is, numgas,   &
+                               esm_ic == 2 .OR. esm_ic == 4, esm_ic == 3,      &
+                               esm_ic == 4, 0, moist(i,kts,j,p_qv),            &
+                               p8w(i,kts,j), config_flags%chem_opt, chm_is_moz )
+                      esm_sw_rc(:, esm_sw_n) = rcx(1:numgas)
+                    END DO
+                  END DO
+                END DO
+                CALL esm_dump_var('sweep_rc', esm_sw_rc)
+!               temperature ladder over deciduous forest (USGS 11), season 1
+                esm_sw_n = 0
+                DO esm_it = 1, 5
+                  esm_ta = 253.15 + 15.0*REAL(esm_it-1)
+                  DO esm_ic = 1, 4
+                    esm_sw_n = esm_sw_n + 1
+                    CALL rc( rcx, esm_ta, rad, rhchem, 11, 1, numgas,          &
+                             esm_ic == 2 .OR. esm_ic == 4, esm_ic == 3,        &
+                             esm_ic == 4, 0, moist(i,kts,j,p_qv),              &
+                             p8w(i,kts,j), config_flags%chem_opt, chm_is_moz )
+                    esm_sw_tc(:, esm_sw_n) = rcx(1:numgas)
+                  END DO
+                END DO
+                CALL esm_dump_var('sweep_rc_t', esm_sw_tc)
+!               Ra / Rb / cellvg: stability x friction velocity, at this
+!               column's own surface resistances
+                esm_sw_n = 0
+                DO esm_it = 1, 5
+                  esm_rmol = -0.05 + 0.025*REAL(esm_it-1)
+                  DO esm_ic = 1, 3
+                    esm_ust = 0.1 + 0.45*REAL(esm_ic-1)
+                    esm_sw_n = esm_sw_n + 1
+                    ddvel0d(1:numgas) = 0.
+                    esm_ar1 = 0.; esm_ar2 = 0.
+                    CALL landusevg( ddvel0d, esm_ust, esm_rmol, zntt, z1,      &
+                                    dvpart, iland, numgas, srfres, esm_ar1,    &
+                                    esm_ar2, p_sulf )
+                    esm_sw_vd(:, esm_sw_n) = ddvel0d(1:numgas)
+                    esm_sw_ar(esm_sw_n) = esm_ar1
+                    esm_sw_us(esm_sw_n) = esm_ust
+                    esm_sw_rm(esm_sw_n) = esm_rmol
+                  END DO
+                END DO
+                CALL esm_dump_var('sweep_vd', esm_sw_vd)
+                CALL esm_dump_var('sweep_vd_aer_res', esm_sw_ar)
+                CALL esm_dump_var('sweep_vd_ustar', esm_sw_us)
+                CALL esm_dump_var('sweep_vd_rmol', esm_sw_rm)
+                CALL esm_dump_var('sweep_vd_srfres', srfres(1:numgas))
+                CALL esm_dump_var('sweep_vd_zntt', zntt)
+                CALL esm_dump_var('sweep_vd_z1', z1)
+                CALL esm_dump_var('sweep_vd_iland', iland)
+                CALL esm_dump_close()
+                DEALLOCATE( esm_sw_rc, esm_sw_tc, esm_sw_vd )
+              END IF
             END IF
 
 !-----------------------------------------------------------

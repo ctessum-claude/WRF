@@ -35,7 +35,7 @@ module module_esm_dump
   implicit none
   private
   public :: esm_dump_want, esm_dump_open, esm_dump_open_file, esm_dump_close, esm_dump_var
-  public :: esm_dump_active, esm_dump_inner
+  public :: esm_dump_active, esm_dump_inner, esm_sweep_want
 
   ! esm_dump_inner: set by a wrapper (or driver) to let dump calls placed
   ! INSIDE a kernel (sub-process diagnostics) append to the open file.  The
@@ -85,6 +85,17 @@ contains
       if (p > len_trim(val)) exit
     end do
   end function env_list_has
+
+  ! esm_sweep_want: true when ESM_SWEEP is set to a non-empty value.  A scheme
+  ! uses it to run an offline regime sweep of its own kernel beside the in-model
+  ! dump, so that a component can be tested over regimes the reference run never
+  ! visits.  Separate from ESM_DUMP so a sweep never fires by accident.
+  logical function esm_sweep_want() result(want)
+    character(len=1024) :: val
+    integer :: stat
+    call get_environment_variable('ESM_SWEEP', val, status=stat)
+    want = (stat == 0 .and. len_trim(val) > 0)
+  end function esm_sweep_want
 
   logical function esm_dump_want(scheme) result(want)
     character(len=*), intent(in) :: scheme

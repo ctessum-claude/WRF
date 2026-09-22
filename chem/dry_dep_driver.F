@@ -42,6 +42,7 @@ CONTAINS
   USE module_domain_type, only : domain
   USE module_dep_simple
   USE module_vertmx_wrf
+  USE module_esm_dump
   USE module_data_sorgam
   USE module_aerosols_sorgam
   USE module_gocart_settling
@@ -183,6 +184,12 @@ CONTAINS
 ! .. Local Arrays ..
       REAL :: p(kts:kte)
    REAL, DIMENSION( its:ite, jts:jte, num_chem ) ::   ddvel
+! EarthSciML instrumentation: vertical mixing of the chem column
+   LOGICAL :: esm_vm_on, esm_vm_want
+   INTEGER, PARAMETER :: esm_vm_ndt = 4
+   REAL, PARAMETER :: esm_vm_dt(esm_vm_ndt) = (/ 0.5, 2.0, 8.0, 32.0 /)
+   INTEGER :: esm_vm_id
+   REAL, ALLOCATABLE :: esm_vm_in(:,:), esm_vm_out(:,:), esm_vm_out_sm(:,:,:), esm_vm_sm(:)
    REAL, DIMENSION( num_chem )                   ::   ddmassn
 
    REAL, DIMENSION( ims:ime, jms:jme, num_chem ) ::   qsrflx ! dry deposition flux of aerosols (explicit aq.-phase cases)
@@ -698,6 +705,7 @@ CONTAINS
       end if
 
       dep_vel_o3=0.
+      esm_vm_want = esm_dump_want('chem_vertmx')
       if (num_vert_mix == 0) then
       do 100 j=jts,jte
       do 100 i=its,ite
@@ -766,6 +774,12 @@ CONTAINS
 !   (03-may-2006 rce - calc dryrho_1d and pass it to vertmx)
 !
       dep_vel_o3(i,j)=ddvel(i,j,p_o3)
+      esm_vm_on = esm_vm_want .AND. i == its .AND. j == jts
+      IF ( esm_vm_on ) THEN
+        ALLOCATE( esm_vm_in(kts:kte,num_chem), esm_vm_out(kts:kte,num_chem), &
+                  esm_vm_out_sm(kts:kte,num_chem,esm_vm_ndt), esm_vm_sm(kts:kte) )
+        esm_vm_in = 0.; esm_vm_out = 0.; esm_vm_out_sm = 0.
+      END IF
       do nv=2,num_chem-0
          if(is_CAMMGMP_used .and. .not.vertMixAero(nv))cycle !Balwinder.Singh@pnnl.gov: Do mix constituents which are already mixed by CAMMGMP microphysics
          do k=kts,kte
@@ -773,6 +787,19 @@ CONTAINS
             dryrho_1d(k) = 1./alt(i,k,j)
          enddo
 
+! EarthSciML instrumentation: vertical mixing of the chem column (i = its, j = jts).
+! Besides the model's own dtstep step, replay the SAME column with a small dt: the
+! scheme is a theta-weighted implicit solve, so (out-in)/dt is dt-dependent and only
+! the dt -> 0 limit is a rate (EqWeFiC CLAUDE.md, "Test shape").
+         IF ( esm_vm_on ) THEN
+           esm_vm_in(kts:kte,nv) = pblst(kts:kte)
+           DO esm_vm_id = 1, esm_vm_ndt
+             esm_vm_sm(kts:kte) = pblst(kts:kte)
+             CALL vertmx(esm_vm_dt(esm_vm_id),esm_vm_sm,ekmfull,dryrho_1d, &
+                         zzfull,zz,ddvel(i,j,nv),kts,kte)
+             esm_vm_out_sm(kts:kte,nv,esm_vm_id) = esm_vm_sm(kts:kte)
+           END DO
+         END IF
          mix_select: SELECT CASE(config_flags%chem_opt)
          CASE (RADM2SORG_AQ, RADM2SORG_AQCHEM, RACMSORG_AQ, RACMSORG_AQCHEM_KPP, RACM_ESRLSORG_AQCHEM_KPP, CBMZ_MOSAIC_4BIN_AQ, &
               CBMZ_MOSAIC_8BIN_AQ, CBMZSORG_AQ, CBMZ_MOSAIC_DMS_4BIN, CBMZ_MOSAIC_DMS_8BIN, CBMZ_MOSAIC_DMS_4BIN_AQ,  &
@@ -796,6 +823,7 @@ CONTAINS
                         zzfull,zz,ddvel(i,j,nv),kts,kte)
             endif
          END SELECT mix_select
+         IF ( esm_vm_on ) esm_vm_out(kts:kte,nv) = pblst(kts:kte)
 
          ! chem is in ppmv
          ! dry deposition is combined with vertical mixing, but column independent.
@@ -831,6 +859,25 @@ CONTAINS
             chem(i,k,j,nv)=max(epsilc,pblst(k))
          enddo
       enddo
+      IF ( esm_vm_on ) THEN
+        CALL esm_dump_open('chem_vertmx')
+        CALL esm_dump_var('kts', kts); CALL esm_dump_var('kte', kte)
+        CALL esm_dump_var('num_chem', num_chem); CALL esm_dump_var('numgas', numgas)
+        CALL esm_dump_var('ktau', ktau); CALL esm_dump_var('dtstep', dtstep)
+        CALL esm_dump_var('dt_ladder', esm_vm_dt)
+        CALL esm_dump_var('zzfull', zzfull(kts:kte+1))
+        CALL esm_dump_var('zz', zz(kts:kte))
+        CALL esm_dump_var('ekmfull', ekmfull(kts:kte+1))
+        CALL esm_dump_var('dryrho', dryrho_1d(kts:kte))
+        CALL esm_dump_var('dz8w', dz8w(i,kts:kte,j))
+        CALL esm_dump_var('ddvel', ddvel(i,j,1:num_chem))
+        CALL esm_dump_var('chem_in', esm_vm_in)
+        CALL esm_dump_var('chem_out', esm_vm_out)
+        CALL esm_dump_var('chem_out_dt_ladder', esm_vm_out_sm)
+        CALL esm_dump_close()
+        DEALLOCATE( esm_vm_in, esm_vm_out, esm_vm_out_sm, esm_vm_sm )
+        esm_vm_on = .false.
+      END IF
 
       if( config_flags%diagnostic_chem == DEPVEL1 .and. &
           (config_flags%chem_opt == CB05_SORG_VBS_AQ_KPP) ) then
