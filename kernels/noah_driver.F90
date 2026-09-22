@@ -81,6 +81,21 @@ program noah_driver
   infxsrt = 0; etpnd1 = 0; xsda_qfx = 0; hfx_phy = 0; qfx_phy = 0; xqnorm = 0
   sfcspd = 0; cosz = 0; prcprain = 0; solardirect = 0; cm = 0
 
+  ! EqWeFiC cold-season instrumentation: the SNOPAC and frozen-soil publishers
+  ! are module variables, so clear them before the call -- a layer that SNKSRC
+  ! does not visit must read back as "not called", not as the previous call's value.
+  ESM_SNO_BRANCH = 0
+  ESM_SNO_T12 = 0.0; ESM_SNO_T12A = 0.0; ESM_SNO_T12B = 0.0
+  ESM_SNO_DENOM = 0.0; ESM_SNO_DTOT = 0.0; ESM_SNO_DSOIL = 0.0
+  ESM_SNO_DF1 = 0.0; ESM_SNO_YY = 0.0; ESM_SNO_ZZ1 = 0.0
+  ESM_SNO_ETANRG = 0.0; ESM_SNO_ESNOW1 = 0.0; ESM_SNO_ESNOW2 = 0.0
+  ESM_SNO_EX = 0.0; ESM_SNO_PRCP1 = 0.0; ESM_SNO_SNDENS = 0.0
+  ESM_SNO_ESD = 0.0; ESM_SNO_SNOMLT = 0.0; ESM_SNO_FLX1 = 0.0; ESM_SNO_FLX3 = 0.0
+  ESM_FRZ_TAVG = 0.0; ESM_FRZ_TBND = 0.0; ESM_FRZ_TSNSR = 0.0
+  ESM_FRZ_FREE = 0.0; ESM_FRZ_XH2O = 0.0; ESM_FRZ_QTOT = 0.0
+  ESM_FRZ_CALLED = 0; ESM_FRZ_NLOG = 0; ESM_FRZ_PATH = 0; ESM_FRZ_TSURF = 0.0
+  ESM_FRZ_SH2O_IN(1:nsoil) = sh2o(1:nsoil)
+
   call SFLX(IILOC=iiloc, JJLOC=jjloc, FFROZP=ffrozp, ISURBAN=isurban, DT=dt, ZLVL=zlvl, NSOIL=nsoil, &
        SLDPTH=sldpth, LOCAL=local, LLANDUSE=llanduse, LSOIL=lsoil, LWDN=lwdn, SOLDN=soldn, SOLNET=solnet, &
        SFCPRS=sfcprs, PRCP=prcp, SFCTMP=sfctmp, Q2=q2k, SFCSPD=sfcspd, COSZ=cosz, PRCPRAIN=prcprain, &
@@ -127,5 +142,32 @@ program noah_driver
   call esm_dump_var('rch', ESM_RCH); call esm_dump_var('rr', ESM_RR)
   call esm_dump_var('epsca', ESM_EPSCA); call esm_dump_var('t24', ESM_T24)
   call esm_dump_var('fdown_pen', ESM_FDOWN)
+  ! SNOPAC's snow-surface energy-balance closure and snow-pack internals, and the
+  ! frozen-soil sink per layer (HRT -> TBND/TMPAVG/SNKSRC -> FRH2O).  sno_branch is
+  ! 0 when SNOPAC was not called, 1 for its sub-freezing block, 2 for its melt block;
+  ! frz_path is 1 when FRH2O returned FREE = SMC, 2 for the converged Newton
+  ! iteration and 3 for the Flerchinger explicit fallback (the 10-iteration cap).
+  call esm_dump_var('sno_branch', ESM_SNO_BRANCH)
+  call esm_dump_var('sno_t12', ESM_SNO_T12); call esm_dump_var('sno_t12a', ESM_SNO_T12A)
+  call esm_dump_var('sno_t12b', ESM_SNO_T12B); call esm_dump_var('sno_denom', ESM_SNO_DENOM)
+  call esm_dump_var('sno_dtot', ESM_SNO_DTOT); call esm_dump_var('sno_dsoil', ESM_SNO_DSOIL)
+  call esm_dump_var('sno_df1', ESM_SNO_DF1); call esm_dump_var('sno_yy', ESM_SNO_YY)
+  call esm_dump_var('sno_zz1', ESM_SNO_ZZ1); call esm_dump_var('sno_etanrg', ESM_SNO_ETANRG)
+  call esm_dump_var('sno_esnow1', ESM_SNO_ESNOW1); call esm_dump_var('sno_esnow2', ESM_SNO_ESNOW2)
+  call esm_dump_var('sno_ex', ESM_SNO_EX); call esm_dump_var('sno_prcp1', ESM_SNO_PRCP1)
+  call esm_dump_var('sno_sndens', ESM_SNO_SNDENS); call esm_dump_var('sno_esd', ESM_SNO_ESD)
+  call esm_dump_var('sno_snomlt', ESM_SNO_SNOMLT)
+  call esm_dump_var('sno_flx1', ESM_SNO_FLX1); call esm_dump_var('sno_flx3', ESM_SNO_FLX3)
+  call esm_dump_var('frz_tsurf', ESM_FRZ_TSURF)
+  call esm_dump_var('frz_tavg', ESM_FRZ_TAVG(1:nsoil))
+  call esm_dump_var('frz_tbnd', ESM_FRZ_TBND(1:nsoil))
+  call esm_dump_var('frz_tsnsr', ESM_FRZ_TSNSR(1:nsoil))
+  call esm_dump_var('frz_free', ESM_FRZ_FREE(1:nsoil))
+  call esm_dump_var('frz_xh2o', ESM_FRZ_XH2O(1:nsoil))
+  call esm_dump_var('frz_qtot', ESM_FRZ_QTOT(1:nsoil))
+  call esm_dump_var('frz_sh2o_in', ESM_FRZ_SH2O_IN(1:nsoil))
+  call esm_dump_var('frz_called', ESM_FRZ_CALLED(1:nsoil))
+  call esm_dump_var('frz_nlog', ESM_FRZ_NLOG(1:nsoil))
+  call esm_dump_var('frz_path', ESM_FRZ_PATH(1:nsoil))
   call esm_dump_close()
 end program noah_driver

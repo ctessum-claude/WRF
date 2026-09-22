@@ -2861,6 +2861,7 @@ rconfig   integer scm_lu_index            namelist,scm  1       2           rh  
 rconfig   integer scm_isltyp              namelist,scm  1       4           rh   "scm_isltyp"           "SCM soil category" ""
 rconfig   real    scm_vegfra              namelist,scm  1       50.         rh   "scm_vegfra"           "SCM vegetation fraction" ""
 rconfig   real    scm_canwat              namelist,scm  1       0.0         rh   "scm_canwat"           "SCM canopy water" "kg m-2"
+rconfig   real    scm_snow                namelist,scm  1       0.0         rh   "scm_snow"             "SCM initial snow water equivalent" "kg m-2"
 rconfig   real    scm_lat                 namelist,scm  1        36.605     rh   "scm_lat"              "SCM latitude" "degrees"
 rconfig   real    scm_lon                 namelist,scm  1       -97.485     rh   "scm_lon"              "SCM longitude" "degrees"
 rconfig   logical scm_th_t_tend           namelist,scm  1       .true.      rh   "scm_th_t_adv"         "Turn on large scale theta tendency in SCM"   ""

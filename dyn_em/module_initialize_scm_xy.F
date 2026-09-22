@@ -243,7 +243,17 @@ CONTAINS
               grid%isltyp(i,j)  = config_flags%scm_isltyp
               grid%ivgtyp(i,j)  = config_flags%scm_lu_index
               grid%xice(i,j) = 0.
-              grid%snow(i,j) = 0.
+! EarthSciML instrumentation: the SCM hard-wired snow to zero, which makes Noah's
+! SNOPAC and the snow-covered frozen-soil paths unreachable in any idealized column.
+! scm_snow (kg m-2 SWE, default 0.0) restores the original behaviour when unset;
+! LSMINIT derives SNOWH from it at 200 kg m-3 when SNOWH is not in the input.
+              grid%snow(i,j) = config_flags%scm_snow
+! SNOWH must be set here too: module_physics_init.F declares FNDSNOWH as a
+! PARAMETER .true., so LSMINIT never derives the physical snow depth from SWE,
+! and SFLX aborts in "Physical snow depth is less than snow water equiv."
+! when SNEQV > 1e-7 with SNOWH = 0.  200 kg m-3 is LSMINIT's own new-snow
+! density (its SNOWH = SNOW*0.005 branch).
+              grid%snowh(i,j) = config_flags%scm_snow * 0.005
            END DO
         END DO
 
