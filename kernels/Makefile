@@ -14,7 +14,7 @@ B = build
 P = ../phys
 M = ../phys/physics_mmm
 
-DRIVERS = $(B)/gwdo_driver $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/solar_driver $(B)/cldfra_driver
+DRIVERS = $(B)/gwdo_driver $(B)/gwdo_diag_driver $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/solar_driver $(B)/cldfra_driver
 all: $(DRIVERS)
 
 $(B):
@@ -52,6 +52,14 @@ $(B)/module_sf_slab.o: $(P)/module_sf_slab.F $(B)/module_esm_dump.o
 $(B)/ysu_driver: ysu_driver.F90 $(COMMON) $(B)/bl_ysu.o
 	$(FC) $(FFLAGS) -I$(B) -J$(B) $^ -o $@
 $(B)/gwdo_driver: gwdo_driver.F90 $(COMMON) $(B)/bl_gwdo.o
+	$(FC) $(FFLAGS) -I$(B) -J$(B) $^ -o $@
+# gwdo_diag_driver: same kernel with the per-column branch record exposed, for
+# comparing the real32 and real64 branch decisions of one dumped row.
+$(B)/bl_gwdo_diag.F90: $(M)/bl_gwdo.F90 gwdo_diag_patch.py | $(B)
+	python3 gwdo_diag_patch.py $< $@
+$(B)/bl_gwdo_diag.o: $(B)/bl_gwdo_diag.F90 $(B)/ccpp_kind_types.o
+	$(FC) $(FFLAGS) -J$(B) -I$(B) -c $< -o $@
+$(B)/gwdo_diag_driver: gwdo_diag_driver.F90 $(COMMON) $(B)/bl_gwdo_diag.o
 	$(FC) $(FFLAGS) -I$(B) -J$(B) $^ -o $@
 $(B)/sfclayrev_driver: sfclayrev_driver.F90 $(COMMON) $(B)/sf_sfclayrev.o
 	$(FC) $(FFLAGS) -I$(B) -J$(B) $^ -o $@
