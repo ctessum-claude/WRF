@@ -452,6 +452,8 @@
 	    call esm_dump_var('ltot2', ltot2); call esm_dump_var('kclm_calcbgn', kclm_calcbgn)
 	    call esm_dump_var('kclm_calcend', kclm_calcend)
 	    call esm_dump_var('ktemp', ktemp); call esm_dump_var('kh2o', kh2o)
+	    call esm_dump_var('kh2so4', kh2so4); call esm_dump_var('knh3', knh3)
+	    call esm_dump_var('kso2', kso2)
 	    do esm_l = 1, ltot2
 	        write(esm_tag,'(a,i4.4)') 'name_', esm_l
 	        call esm_dump_var(trim(esm_tag), trim(name(esm_l)))
@@ -500,6 +502,35 @@
 
     call wrf_debug(300,"mosaic_aerchem_driver: back from aerchemistry")
 	if (esm_col) call esm_dump_var('rsub_therm', rsub(1:ltot2,kclm_calcbgn:kclm_calcend,1))
+!   EarthSciML instrumentation: the section geometry, composition pointers and
+!   the post-growth column diagnostics that mosaic_newnuc_1clm and
+!   mosaic_coag_1clm read from the data modules, so those two stages can be
+!   replayed standalone (kernels/mosaic_subproc_driver.F90).
+	if (esm_col) then
+	    call esm_dump_var('nsize_aer', nsize_aer(1)); call esm_dump_var('ncomp_aer', ncomp_aer(1))
+	    call esm_dump_var('ncomp_plustracer_aer', ncomp_plustracer_aer(1))
+	    call esm_dump_var('ntype_aer', ntype_aer); call esm_dump_var('nphase_aer', nphase_aer)
+	    call esm_dump_var('ai_phase', ai_phase)
+	    call esm_dump_var('massptr_aer', massptr_aer(1:ncomp_aer(1),1:nsize_aer(1),1,ai_phase))
+	    call esm_dump_var('numptr_aer', numptr_aer(1:nsize_aer(1),1,ai_phase))
+	    call esm_dump_var('waterptr_aer', waterptr_aer(1:nsize_aer(1),1))
+	    call esm_dump_var('hyswptr_aer', hyswptr_aer(1:nsize_aer(1),1))
+	    call esm_dump_var('lptr_so4_aer', lptr_so4_aer(1:nsize_aer(1),1,ai_phase))
+	    call esm_dump_var('lptr_nh4_aer', lptr_nh4_aer(1:nsize_aer(1),1,ai_phase))
+	    call esm_dump_var('dens_aer', dens_aer(1:ncomp_aer(1),1))
+	    call esm_dump_var('mw_aer', mw_aer(1:ncomp_aer(1),1))
+	    call esm_dump_var('dcen_sect', dcen_sect(1:nsize_aer(1),1))
+	    call esm_dump_var('dlo_sect', dlo_sect(1:nsize_aer(1),1))
+	    call esm_dump_var('dhi_sect', dhi_sect(1:nsize_aer(1),1))
+	    call esm_dump_var('volumcen_sect', volumcen_sect(1:nsize_aer(1),1))
+	    call esm_dump_var('volumlo_sect', volumlo_sect(1:nsize_aer(1),1))
+	    call esm_dump_var('volumhi_sect', volumhi_sect(1:nsize_aer(1),1))
+	    call esm_dump_var('aqvoldry_sub', aqvoldry_sub(1:nsize_aer(1),1,kclm_calcbgn:kclm_calcend,1))
+	    call esm_dump_var('aqmassdry_sub', aqmassdry_sub(1:nsize_aer(1),1,kclm_calcbgn:kclm_calcend,1))
+	    call esm_dump_var('adrydens_sub', adrydens_sub(1:nsize_aer(1),1,kclm_calcbgn:kclm_calcend,1))
+	    call esm_dump_var('rsub0', rsub0(1:ltot2,kclm_calcbgn:kclm_calcend,1))
+	    call esm_dump_var('idiagbb_dum', idiagbb_dum)
+	end if
 !	if ((it .eq.45) .and. (jt .eq.71)   &
 !			.and. (ktau.eq.240)) then
 !	    call aerchem_debug_dump( 3, it, jt, dtchem )
