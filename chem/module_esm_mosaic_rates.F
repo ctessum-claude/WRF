@@ -76,6 +76,16 @@
       real, save :: esm_mtc_num(esm_maxbin, esm_maxk)
       real, save :: esm_mtc_tk(esm_maxk), esm_mtc_patm(esm_maxk)
 
+!   the Brownian coagulation kernel and the per-bin sizes it is built from,
+!   recorded inside coagsolv once the kernel matrix is filled:
+!     esm_coag_cbr      cbr(i,j), cm^3/(particle*s)
+!     esm_coag_dpwet    dpwet_inp(i), cm, and esm_coag_denswet denswet_inp(i), g/cm^3
+!     esm_coag_tk       tkelvin (K) and esm_coag_patm patm (atm) of the cell
+      real, save :: esm_coag_cbr(esm_maxbin, esm_maxbin, esm_maxk)
+      real, save :: esm_coag_dpwet(esm_maxbin, esm_maxk)
+      real, save :: esm_coag_denswet(esm_maxbin, esm_maxk)
+      real, save :: esm_coag_tk(esm_maxk), esm_coag_patm(esm_maxk)
+
 !   shapes actually used, so a consumer does not have to guess
       integer, save :: esm_nbin = 0, esm_ncomp_coag = 0, esm_ngas = 0
 !   MOSAIC's gas indices, dumped with the rates
@@ -97,6 +107,11 @@
       esm_mtc_num = 0.0
       esm_mtc_tk = 0.0
       esm_mtc_patm = 0.0
+      esm_coag_cbr = 0.0
+      esm_coag_dpwet = 0.0
+      esm_coag_denswet = 0.0
+      esm_coag_tk = 0.0
+      esm_coag_patm = 0.0
       end subroutine esm_rates_reset
 
       end module module_esm_mosaic_rates

@@ -866,6 +866,15 @@
 ! copy initial number concentration (#/cm3-air) and volume concentrations
 !   (cm3/cm3-air) from num/vol_distrib_inp (real*4) to distrib (real*8)
 ! ***********************************************************************
+       if (esm_rate_on) then
+         do i = 1, irad
+           esm_coag_dpwet(i,esm_rate_k)   = dpwet_inp(i)
+           esm_coag_denswet(i,esm_rate_k) = denswet_inp(i)
+         end do
+         esm_coag_tk(esm_rate_k)   = tkelvin
+         esm_coag_patm(esm_rate_k) = patm
+       end if
+
        do i = 1, irad
          distrib(i,1) = num_distrib_inp(i)
        end do
@@ -937,6 +946,10 @@
            term2      = 4.    * sumdc / (rsuma * ggr)
            cbr        = fourpi * rsuma * sumdc / (term1 + term2)
            rrate(i,j) = cbr * deltat
+! EarthSciML instrumentation: the Brownian kernel itself.  The assembled rates
+! this routine goes on to form are weighted sums over bin pairs, so cbr cannot
+! be recovered from them; it is recorded here.
+           if (esm_rate_on) esm_coag_cbr(i,j,esm_rate_k) = cbr
 !yy        write(kout,9190) (2.0e4*radius(i)), (2.0e4*radius(j)), cbr
  154     continue
  155   continue
