@@ -983,8 +983,6 @@
         real qh2so4_crit              ! critical h2so4 mixrat (ppm)
         real qh2so4_avail             ! amount of h2so4 available for new particles (ppm)
         real vol_part                 ! "grown" single-particle volume (cm3)
-! EarthSciML instrumentation: the dt -> 0 limit of this calculation
-        real esm_rate_so4, esm_rate_nh4, esm_rate_num, esm_mass_lim
 
 
 !
@@ -1004,7 +1002,16 @@
 ! ch2so4 = (ug-h2so4/m3-air)
 ! ch2so4*1.0e-12/mwh2so4 = (mole-h2so4/cm3-air)
         qh2so4_crit = (ch2so4_crit*1.0e-12/98.0)/cair
-        qh2so4_avail = (qh2so4_cur - qh2so4_crit)*dtnuc
+! EarthSciML bug fix (EqWeFiC FORTRAN_BUGS B20).  Stock WRF 4.8 has
+!     qh2so4_avail = (qh2so4_cur - qh2so4_crit)*dtnuc
+! which multiplies an excess mixing ratio by the time step and then uses the
+! product as a mixing ratio: qh2so4_avail is declared "(ppm)" above, the guard
+! below compares it against a concentration, and the composition partition
+! divides qnh3_cur by it as a "gas molar ratio".  WRF's own newer copy of this
+! routine, module_mosaic_newnucb.F:1668, has the line without the *dtnuc, which
+! is Wexler's assumption that nucleation is fast on the step, so the vapour
+! relaxes to the critical concentration and the excess forms new particles.
+        qh2so4_avail = qh2so4_cur - qh2so4_crit
 
 ! if "available" h2so4 vapor < 4.0e-18 mole/mole-air ~= 1.0e2 molecules/cm3, 
 ! exit with new particle formation = 0
@@ -1069,26 +1076,27 @@
 ! change to aerosol number (in #/mole-air)
         qnuma_del = (qso4a_del*mw_so4a + qnh4a_del*mw_nh4a)/mass_part
 
-! EarthSciML instrumentation: the same calculation in the dt -> 0 limit.
-!   qh2so4_avail = (qh2so4_cur - qh2so4_crit)*dtnuc is an AMOUNT built from an
-!   excess RATE, so the rate is (qh2so4_cur - qh2so4_crit) per second.  Two
-!   finite-step limiters have no dt -> 0 counterpart and are dropped here: the
-!   0.9999*q caps (amounts, so 0.9999*q/dt -> infinity), and the composition
-!   partition, which divides qnh3_cur by the dt-SCALED qh2so4_avail and so
-!   tends to the fully neutralised (ammonium sulfate) limit as dt -> 0.  The
-!   finite-step increment is recorded beside this by the caller, so the two can
-!   be compared rather than conflated.
+! EarthSciML instrumentation.  With B20 fixed, this scheme is an instantaneous
+! PROJECTION, not a rate: the vapour is relaxed to the critical concentration
+! and the excess becomes new particles, so the increment below is the same
+! whatever dtnuc is.  There is therefore no dt -> 0 rate to record -- recording
+! one would invent a quantity the scheme does not have -- so what is filed here
+! is the projection itself, in mol/mol-air per call.  The caller files the same
+! increments divided by dtnuc beside it, which is what a consumer that insists
+! on a rate would see, and which now scales as 1/dtnuc.
         if (esm_rate_on) then
-          esm_rate_so4 = max( 0.0, qh2so4_cur - qh2so4_crit )
-          esm_rate_nh4 = 2.0*esm_rate_so4
-          esm_mass_lim = vol_part*dens_ammsulf
-          esm_rate_num = (esm_rate_so4*mw_so4a + esm_rate_nh4*mw_nh4a)/esm_mass_lim
-          esm_rate_newnuc(1,esm_rate_k) = -esm_rate_so4
-          esm_rate_newnuc(2,esm_rate_k) = -esm_rate_nh4
-          esm_rate_newnuc(3,esm_rate_k) =  esm_rate_so4
-          esm_rate_newnuc(4,esm_rate_k) =  esm_rate_nh4
-          esm_rate_newnuc(5,esm_rate_k) =  esm_rate_num
-          esm_rate_newnuc(6,esm_rate_k) =  real(isize_nuc)
+          esm_rate_newnuc(1,esm_rate_k) = qh2so4_del
+          esm_rate_newnuc(2,esm_rate_k) = qnh3_del
+          esm_rate_newnuc(3,esm_rate_k) = qso4a_del
+          esm_rate_newnuc(4,esm_rate_k) = qnh4a_del
+          esm_rate_newnuc(5,esm_rate_k) = qnuma_del
+          esm_rate_newnuc(6,esm_rate_k) = real(isize_nuc)
+!   the composition of the new particles, which B20 also corrupted
+          esm_rate_newnuc_extra(1,esm_rate_k) = molenh4a_per_moleso4a
+          esm_rate_newnuc_extra(2,esm_rate_k) = dens_part
+          esm_rate_newnuc_extra(3,esm_rate_k) = qh2so4_crit
+          esm_rate_newnuc_extra(4,esm_rate_k) = qh2so4_cur
+          esm_rate_newnuc_extra(5,esm_rate_k) = qnh3_cur
         end if
 
 

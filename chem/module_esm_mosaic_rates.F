@@ -30,14 +30,24 @@
       integer, parameter :: esm_maxcomp = 40    ! coagulation components + 3
       integer, parameter :: esm_maxgas  = 10    ! MOSAIC volatile gases
 
-!   nucleation, dt -> 0 limit, in the units of rsub (mol/mol for gases and
-!   aerosol species, particles/mol-air for number) per second
+!   nucleation.  With FORTRAN_BUGS B20 fixed the scheme is an instantaneous
+!   PROJECTION (the vapour relaxes to the critical concentration and the excess
+!   forms particles), so what is recorded is the projection increment itself,
+!   in the units of rsub (mol/mol-air for gases and aerosol species,
+!   particles/mol-air for number) PER CALL, not per second.
       real, save :: esm_rate_newnuc(6, esm_maxk)
 !     rows: 1 h2so4, 2 nh3, 3 so4_a(bin), 4 nh4_a(bin), 5 num_a(bin),
-!           6 the bin index the new particles go into (not a rate)
+!           6 the bin index the new particles go into (not an increment)
 
-!   nucleation as WRF actually applies it, increment/dtnuc, same rows/units
+!   the same increments divided by dtnuc, which is what a consumer that insists
+!   on a rate would see; with B20 fixed this scales as 1/dtnuc
       real, save :: esm_rate_newnuc_fd(6, esm_maxk)
+
+!   the composition and thresholds B20 also corrupted:
+!     1 (mole aerosol nh4)/(mole aerosol so4) of the new particles
+!     2 their dry density (g/cm3)
+!     3 qh2so4_crit, 4 qh2so4_cur, 5 qnh3_cur (mol/mol-air)
+      real, save :: esm_rate_newnuc_extra(5, esm_maxk)
 
 !   coagulation, evaluated at the state the stage starts from:
 !     d(number)/dt   in the units of num_distrib per second
@@ -65,6 +75,7 @@
       subroutine esm_rates_reset()
       esm_rate_newnuc      = 0.0
       esm_rate_newnuc_fd   = 0.0
+      esm_rate_newnuc_extra = 0.0
       esm_rate_coag_num    = 0.0
       esm_rate_coag_vol    = 0.0
       esm_rate_cond_nonvol = 0.0

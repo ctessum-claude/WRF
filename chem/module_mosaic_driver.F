@@ -589,6 +589,7 @@
 	    call esm_dump_var('rate_igas_nh3', esm_inh3)
 	    call esm_dump_var('rate_newnuc', esm_rate_newnuc(:,kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('rate_newnuc_finitedt', esm_rate_newnuc_fd(:,kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('newnuc_composition', esm_rate_newnuc_extra(:,kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('rate_coag_num', esm_rate_coag_num(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('rate_coag_vol', esm_rate_coag_vol(1:max(esm_nbin,1),1:max(esm_ncomp_coag,1),kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('rate_cond_nonvol', esm_rate_cond_nonvol(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))

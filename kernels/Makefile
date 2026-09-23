@@ -84,11 +84,13 @@ $(B)/mosaic_drydep_kernel.o: $(B)/mosaic_drydep_kernel.F90 $(B)/module_data_mosa
 	$(FC) $(FFLAGS) $(PROMO) -ffixed-line-length-none -J$(B) -I$(B) -c $< -o $@
 $(B)/module_state_description.o: ../frame/module_state_description.F | $(B)
 	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $< -o $@
-$(B)/module_mosaic_newnuc.o: $(C)/module_mosaic_newnuc.F $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o $(B)/module_state_description.o
+$(B)/module_esm_mosaic_rates.o: $(C)/module_esm_mosaic_rates.F | $(B)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $< -o $@
+$(B)/module_mosaic_newnuc.o: $(B)/module_esm_mosaic_rates.o $(C)/module_mosaic_newnuc.F $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o $(B)/module_state_description.o
 	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
-$(B)/module_mosaic_coag.o: $(C)/module_mosaic_coag.F $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o $(B)/module_state_description.o
+$(B)/module_mosaic_coag.o: $(B)/module_esm_mosaic_rates.o $(C)/module_mosaic_coag.F $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o $(B)/module_state_description.o
 	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
-MOSSUB = $(B)/stub_wrf_msg.o $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o \
+MOSSUB = $(B)/module_esm_mosaic_rates.o $(B)/stub_wrf_msg.o $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o \
          $(B)/module_peg_util.o $(B)/module_state_description.o \
          $(B)/module_mosaic_newnuc.o $(B)/module_mosaic_coag.o
 
