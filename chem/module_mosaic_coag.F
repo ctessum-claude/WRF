@@ -37,6 +37,7 @@
 !	that was obtained from mark jacobson in june 2003,
 !	and then modified to work with mosaic aerosol routines
 !
+	use module_esm_mosaic_rates
 	use module_data_mosaic_asect
 	use module_data_mosaic_other
 	use module_state_description, only:  param_first_scalar
@@ -296,6 +297,8 @@
 !
 !   make call to coagulation routine
 !
+!   EarthSciML instrumentation: file the rates against this column level
+	if (esm_rate_on) esm_rate_k = k
 	call coagsolv(   &
 	    nsize, maxd_asize, ncomp_coag, ncomp_coag_maxd,   &
 	    temp_box, patm_box, dtcoag, nsubstep_coag,   &
@@ -481,6 +484,7 @@
         dpdry_inp, dpwet_inp, denswet_inp,   &
         num_distrib_inp, vol_distrib_inp )
 
+      use module_esm_mosaic_rates
       implicit none
 
 !
@@ -653,6 +657,8 @@
 
 !wig, 11-Dec-2006: real*8 causing core dumps on IBM's (i.e. bluesky)
 !      real*8 aknud, aloss, amu, avg,   &
+      real esm_prod, esm_aloss
+      integer esm_i, esm_j, esm_jb, esm_k, esm_jaer
       real aknud, aloss, amu, avg,   &
              boltg, bpm,   &
              cbr, consmu, cpi,   &
@@ -971,6 +977,56 @@
 !             solve coagulation over several time steps
 ! *********************************************************************
 !
+! EarthSciML instrumentation: the INSTANTANEOUS coagulation rate at the state
+! this stage starts from, formed from the same production and loss sums the
+! solver uses below, but evaluated with the input distribution rather than the
+! partially updated one, and divided by deltat (rrate = kernel*deltat, so
+! prod and aloss are dimensionless).  The solver itself is semi-implicit,
+! cc2_new = (cc2 + prod)/(1 + aloss), so its increment over a finite step is
+! not this rate times the step.
+      if (esm_rate_on) then
+        do esm_jaer = 1, iaerty
+          do esm_k = 1, irad
+            esm_prod = 0.
+            if (esm_k .gt. 1) then
+              if (esm_jaer .eq. 1) then
+                do esm_i = 1, esm_k
+                  do esm_jb = 1, jbins(esm_i,esm_k)
+                    esm_j = jbinik(esm_i,esm_k,esm_jb)
+                    esm_prod = esm_prod + fink(esm_i,esm_jb,esm_k)*rrate(esm_i,esm_j)*   &
+                               distrib(esm_j,esm_jaer)*volume(esm_j)*distrib(esm_i,1)
+                  end do
+                end do
+                esm_prod = esm_prod/volume(esm_k)
+              else
+                do esm_i = 1, esm_k
+                  do esm_jb = 1, jbins(esm_i,esm_k)
+                    esm_j = jbinik(esm_i,esm_k,esm_jb)
+                    esm_prod = esm_prod + fink(esm_i,esm_jb,esm_k)*rrate(esm_i,esm_j)*   &
+                               distrib(esm_j,esm_jaer)*distrib(esm_i,1)
+                  end do
+                end do
+              end if
+            end if
+            esm_aloss = 0.
+            if (esm_k .lt. irad) then
+              do esm_j = 1, irad
+                esm_aloss = esm_aloss + floss(esm_k,esm_j)*rrate(esm_k,esm_j)*distrib(esm_j,1)
+              end do
+            end if
+            if (esm_jaer .eq. 1) then
+              esm_rate_coag_num(esm_k,esm_rate_k) =   &
+                  (esm_prod - esm_aloss*distrib(esm_k,esm_jaer))/deltat
+            else
+              esm_rate_coag_vol(esm_k,esm_jaer-1,esm_rate_k) =   &
+                  (esm_prod - esm_aloss*distrib(esm_k,esm_jaer))/deltat
+            end if
+          end do
+        end do
+        esm_nbin = irad
+        esm_ncomp_coag = iaerty - 1
+      end if
+
       do 700 isubstep  = 1, nsubstep
 !
         do 485 jaer  = 1, iaerty

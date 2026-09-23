@@ -12,6 +12,7 @@
 
 
 
+      use module_esm_mosaic_rates
       use module_data_mosaic_therm
       use module_peg_util
 
@@ -135,6 +136,8 @@
 
         do 100 k = kclm_aer_calcbgn, kclm_aer_calcend
           kclm_aer = k
+!         EarthSciML instrumentation: file this level's rates against it
+          if (esm_rate_on) esm_rate_k = k
           if (afracsubarea(k,m) .lt. 1.e-4) goto 100
 
           istat_mosaic_fe1 = 1
@@ -5803,6 +5806,22 @@
 
 501   continue
 
+! EarthSciML instrumentation: on the FIRST ASTEM sub-step the fluxes just formed
+! are the instantaneous semi-volatile condensation/evaporation rates at the
+! state this stage starts from (flux = kg*(gas - surface value), solid and
+! liquid parts).  Later sub-steps are at a state ASTEM has already advanced, so
+! only the first is recorded.
+      if (esm_rate_on .and. isteps_ASTEM .eq. 1) then
+        do ibin = 1, nbin_a
+          do iv = 1, ngas_ioa
+            esm_rate_cond_semivol(iv,ibin,esm_rate_k) =   &
+                real( flux_s(iv,ibin) + flux_l(iv,ibin) )
+          end do
+        end do
+        esm_ngas = ngas_ioa
+      end if
+
+
       if(ieqblm_ASTEM .eq. mYES)goto 30	! all bins have reached eqblm, so quit.
 
 !-------------------------
@@ -8068,6 +8087,25 @@
 
 !--------------------------------------
 ! H2SO4
+! EarthSciML instrumentation: the exact dt -> 0 limit of the analytical
+! solution below.  delta_h2so4 = gas*(1 - exp(-sumkg*dt)) is shared over bins
+! as kg(iv,ibin)/sumkg, so d(aer)/dt at t = 0 is gas(iv)*kg(iv,ibin) and the
+! gas loses the sum of those.  Nothing is approximated.
+      if (esm_rate_on) then
+        do ibin = 1, nbin_a
+          if (jaerosolstate(ibin) .ne. no_aerosol) then
+            esm_rate_cond_nonvol(ih2so4_g,ibin,esm_rate_k) = real( gas(ih2so4_g)*kg(ih2so4_g,ibin) )
+            esm_rate_cond_nonvol(imsa_g,  ibin,esm_rate_k) = real( gas(imsa_g)*kg(imsa_g,ibin) )
+          end if
+        end do
+        esm_nbin   = nbin_a
+        esm_ih2so4 = ih2so4_g
+        esm_imsa   = imsa_g
+        esm_ihno3  = ihno3_g
+        esm_ihcl   = ihcl_g
+        esm_inh3   = inh3_g
+      end if
+
       if(gas(ih2so4_g) .gt. 1.e-14)then
 
 ! integrate h2so4 condensation analytically

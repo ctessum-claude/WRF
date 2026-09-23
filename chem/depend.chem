@@ -255,11 +255,11 @@ module_mosaic_movesect.o: module_peg_util.o module_data_mosaic_asect.o module_da
 
 module_mosaic_gly.o: module_data_mosaic_therm.o
 
-module_mosaic_therm.o: module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_data_mosaic_therm.o module_mosaic_movesect.o module_mosaic_gly.o
+module_mosaic_therm.o: module_esm_mosaic_rates.o module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_data_mosaic_therm.o module_mosaic_movesect.o module_mosaic_gly.o
 
-module_mosaic_newnuc.o: module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_mosaic_movesect.o
+module_mosaic_newnuc.o: module_esm_mosaic_rates.o module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_mosaic_movesect.o
 
-module_mosaic_coag.o: module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_mosaic_movesect.o
+module_mosaic_coag.o: module_esm_mosaic_rates.o module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_mosaic_movesect.o
 
 module_mosaic_init_aerpar.o: module_data_mosaic_aero.o
 
@@ -267,7 +267,7 @@ module_mosaic2_driver.o: module_peg_util.o module_mosaic_csuesat.o module_data_m
 
 module_mosaic_sumpm.o: module_data_mosaic_asect.o
 
-module_mosaic_driver.o: ../phys/module_esm_dump.o module_peg_util.o module_mosaic_csuesat.o module_data_mosaic_asect.o module_data_mosaic_other.o module_data_mosaic_therm.o module_mosaic_movesect.o module_mosaic_therm.o module_mosaic_newnuc.o module_mosaic_coag.o module_mosaic_wetscav.o module_mosaic2_driver.o module_mosaic_sumpm.o
+module_mosaic_driver.o: module_esm_mosaic_rates.o ../phys/module_esm_dump.o module_peg_util.o module_mosaic_csuesat.o module_data_mosaic_asect.o module_data_mosaic_other.o module_data_mosaic_therm.o module_mosaic_movesect.o module_mosaic_therm.o module_mosaic_newnuc.o module_mosaic_coag.o module_mosaic_wetscav.o module_mosaic2_driver.o module_mosaic_sumpm.o
 
 module_cmu_dvode_solver.o:
 
@@ -377,3 +377,5 @@ module_cam_mam_mo_sethet.o: ../phys/module_cam_support.o module_cam_mam_mo_chem_
 
 # EarthSciML instrumentation: the RADM2 KPP interface dumps through module_esm_dump
 module_kpp_radm2_interface.o: ../phys/module_esm_dump.o
+
+module_esm_mosaic_rates.o:

@@ -159,6 +159,7 @@
 	use module_mosaic_coag, only:  mosaic_coag_1clm
 	use module_peg_util, only:  peg_error_fatal, peg_message
 	use module_esm_dump, only:  esm_dump_want, esm_dump_open, esm_dump_var, esm_dump_close
+	use module_esm_mosaic_rates
 
         use module_data_mosaic_therm, only: glysoa_param,                 &
                glysoa_param_off, glysoa_param_simple, glysoa_param_complex
@@ -492,6 +493,12 @@
 	if (idiagaa_dum > 0)   &
  	print 93010, 'calling aerchem - it,jt,maerchem =', it, jt, maerchem
 !	print 93010, 'calling aerchem - it,jt,maerchem =', it, jt, maerchem
+!   EarthSciML instrumentation: let each sub-process write its instantaneous
+!   rate for this column (see module_esm_mosaic_rates.F)
+	if (esm_col) then
+	    call esm_rates_reset()
+	    esm_rate_on = .true.
+	end if
 	call aerchemistry( it, jt, kclm_calcbgn, kclm_calcend,   &
                            dtchem, idiagaa_dum, vbs_nbin,        &
                            ph_aer01(it,kms:kme,jt), ph_aer02(it,kms:kme,jt), &
@@ -570,6 +577,22 @@
 		num_moist, num_chem, moist, chem,             &
 		t_phy, p_phy, rho_phy                         )
 	if (esm_col) then
+	    esm_rate_on = .false.
+!   EarthSciML instrumentation: the instantaneous sub-process rates, written by
+!   each process where it forms them (module_esm_mosaic_rates.F), so a stage
+!   reference does not have to be recovered by differencing two real32 states
+	    call esm_dump_var('rate_nbin', esm_nbin)
+	    call esm_dump_var('rate_ncomp_coag', esm_ncomp_coag)
+	    call esm_dump_var('rate_ngas_ioa', esm_ngas)
+	    call esm_dump_var('rate_igas_h2so4', esm_ih2so4); call esm_dump_var('rate_igas_msa', esm_imsa)
+	    call esm_dump_var('rate_igas_hno3', esm_ihno3); call esm_dump_var('rate_igas_hcl', esm_ihcl)
+	    call esm_dump_var('rate_igas_nh3', esm_inh3)
+	    call esm_dump_var('rate_newnuc', esm_rate_newnuc(:,kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('rate_newnuc_finitedt', esm_rate_newnuc_fd(:,kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('rate_coag_num', esm_rate_coag_num(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('rate_coag_vol', esm_rate_coag_vol(1:max(esm_nbin,1),1:max(esm_ncomp_coag,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('rate_cond_nonvol', esm_rate_cond_nonvol(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('rate_cond_semivol', esm_rate_cond_semivol(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('moist_out', moist(it,kts:kte,jt,:)); call esm_dump_var('chem_out', chem(it,kts:kte,jt,:))
 	    call esm_dump_close()
 	end if

@@ -40,6 +40,7 @@
 !   when newnuc_method = 2 (internal parameter), uses
 !	h2so4-h2o binary nucleation from wexler et al., 1994
 !
+	use module_esm_mosaic_rates
 	use module_data_mosaic_asect
 	use module_data_mosaic_other
 	use module_state_description, only:  param_first_scalar
@@ -184,12 +185,25 @@
                isize, qnuma_del, qso4a_del, qnh4a_del,   &
                qh2so4_del, qnh3_del, dens_nh4so4a )
 	else if (newnuc_method .eq. 2) then
+!   EarthSciML instrumentation: tell the kernel which column level it is on, so
+!   it can file its dt -> 0 rates
+            if (esm_rate_on) esm_rate_k = k
             call wexler_nuc_mosaic_1box(   &
                dtnuc, temp_box, rh_box, cair_box,   &
                qh2so4_avg, qh2so4_cur, qnh3_avg, qnh3_cur,   &
                nsize, maxd_asize, volumlo_nuc, volumhi_nuc,   &
                isize, qnuma_del, qso4a_del, qnh4a_del,   &
                qh2so4_del, qnh3_del, dens_nh4so4a )
+!   EarthSciML instrumentation: and the increments it actually applies, divided
+!   by the step they are applied over, for comparison with those rates
+            if (esm_rate_on) then
+              esm_rate_newnuc_fd(1,k) = qh2so4_del/dtnuc
+              esm_rate_newnuc_fd(2,k) = qnh3_del/dtnuc
+              esm_rate_newnuc_fd(3,k) = qso4a_del/dtnuc
+              esm_rate_newnuc_fd(4,k) = qnh4a_del/dtnuc
+              esm_rate_newnuc_fd(5,k) = qnuma_del/dtnuc
+              esm_rate_newnuc_fd(6,k) = real(isize)
+            end if
 	else
 	    istat_newnuc = -1
 	    return
@@ -901,6 +915,7 @@
 !       atmos. environ., 28, 531-546, 1994.
 !
 !.......................................................................
+        use module_esm_mosaic_rates
         implicit none
 
 ! subr arguments (in)
@@ -968,6 +983,8 @@
         real qh2so4_crit              ! critical h2so4 mixrat (ppm)
         real qh2so4_avail             ! amount of h2so4 available for new particles (ppm)
         real vol_part                 ! "grown" single-particle volume (cm3)
+! EarthSciML instrumentation: the dt -> 0 limit of this calculation
+        real esm_rate_so4, esm_rate_nh4, esm_rate_num, esm_mass_lim
 
 
 !
@@ -1051,6 +1068,28 @@
         qnh4a_del =   -qnh3_del
 ! change to aerosol number (in #/mole-air)
         qnuma_del = (qso4a_del*mw_so4a + qnh4a_del*mw_nh4a)/mass_part
+
+! EarthSciML instrumentation: the same calculation in the dt -> 0 limit.
+!   qh2so4_avail = (qh2so4_cur - qh2so4_crit)*dtnuc is an AMOUNT built from an
+!   excess RATE, so the rate is (qh2so4_cur - qh2so4_crit) per second.  Two
+!   finite-step limiters have no dt -> 0 counterpart and are dropped here: the
+!   0.9999*q caps (amounts, so 0.9999*q/dt -> infinity), and the composition
+!   partition, which divides qnh3_cur by the dt-SCALED qh2so4_avail and so
+!   tends to the fully neutralised (ammonium sulfate) limit as dt -> 0.  The
+!   finite-step increment is recorded beside this by the caller, so the two can
+!   be compared rather than conflated.
+        if (esm_rate_on) then
+          esm_rate_so4 = max( 0.0, qh2so4_cur - qh2so4_crit )
+          esm_rate_nh4 = 2.0*esm_rate_so4
+          esm_mass_lim = vol_part*dens_ammsulf
+          esm_rate_num = (esm_rate_so4*mw_so4a + esm_rate_nh4*mw_nh4a)/esm_mass_lim
+          esm_rate_newnuc(1,esm_rate_k) = -esm_rate_so4
+          esm_rate_newnuc(2,esm_rate_k) = -esm_rate_nh4
+          esm_rate_newnuc(3,esm_rate_k) =  esm_rate_so4
+          esm_rate_newnuc(4,esm_rate_k) =  esm_rate_nh4
+          esm_rate_newnuc(5,esm_rate_k) =  esm_rate_num
+          esm_rate_newnuc(6,esm_rate_k) =  real(isize_nuc)
+        end if
 
 
         return
