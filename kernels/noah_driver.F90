@@ -94,6 +94,9 @@ program noah_driver
   ESM_FRZ_TAVG = 0.0; ESM_FRZ_TBND = 0.0; ESM_FRZ_TSNSR = 0.0
   ESM_FRZ_FREE = 0.0; ESM_FRZ_XH2O = 0.0; ESM_FRZ_QTOT = 0.0
   ESM_FRZ_CALLED = 0; ESM_FRZ_NLOG = 0; ESM_FRZ_PATH = 0; ESM_FRZ_TSURF = 0.0
+  ESM_FRZ_XH2O_RAW = 0.0; ESM_FRZ_SH2O_PRE = 0.0; ESM_FRZ_DZ = 0.0
+  ESM_FRZ_CLAMP = -1; ESM_SNO_EX_RAW = 0.0; ESM_SNO_ESD_IN = 0.0
+  ESM_SNO_MELT_BLOCK = 0; ESM_FRZ_SICE = 0.0; ESM_FRZ_SH2O_HRT = 0.0
   ESM_FRZ_SH2O_IN(1:nsoil) = sh2o(1:nsoil)
 
   call SFLX(IILOC=iiloc, JJLOC=jjloc, FFROZP=ffrozp, ISURBAN=isurban, DT=dt, ZLVL=zlvl, NSOIL=nsoil, &
@@ -169,5 +172,16 @@ program noah_driver
   call esm_dump_var('frz_called', ESM_FRZ_CALLED(1:nsoil))
   call esm_dump_var('frz_nlog', ESM_FRZ_NLOG(1:nsoil))
   call esm_dump_var('frz_path', ESM_FRZ_PATH(1:nsoil))
+  ! N97: the sink without differencing -- the raw energy-driven xh2o, the
+  ! pre-update sh2o and dz it is formed from, and which clamp (if any) fired.
+  call esm_dump_var('frz_xh2o_raw', ESM_FRZ_XH2O_RAW(1:nsoil))
+  call esm_dump_var('frz_sh2o_pre', ESM_FRZ_SH2O_PRE(1:nsoil))
+  call esm_dump_var('frz_dz', ESM_FRZ_DZ(1:nsoil))
+  call esm_dump_var('frz_clamp', ESM_FRZ_CLAMP(1:nsoil))
+  call esm_dump_var('sno_ex_raw', ESM_SNO_EX_RAW)
+  call esm_dump_var('sno_esd_in', ESM_SNO_ESD_IN)
+  call esm_dump_var('sno_melt_block', ESM_SNO_MELT_BLOCK)
+  call esm_dump_var('frz_sice', ESM_FRZ_SICE(1:nsoil))
+  call esm_dump_var('frz_sh2o_hrt', ESM_FRZ_SH2O_HRT(1:nsoil))
   call esm_dump_close()
 end program noah_driver
