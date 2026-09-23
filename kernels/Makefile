@@ -107,7 +107,12 @@ $(B)/stub_wrf_error.o: stub_wrf_error.F90 | $(B)
 COLD_INC = noah_esm_cold_state.inc noah_esm_frh2o.inc noah_esm_snksrc.inc \
            noah_esm_hrt_tsurf.inc noah_esm_hrt_tbnd1.inc noah_esm_hrt_tbndk.inc \
            noah_esm_snopac_t12.inc noah_esm_snopac_cold.inc \
-           noah_esm_snopac_melt.inc noah_esm_snopac_end.inc
+           noah_esm_snopac_melt.inc noah_esm_snopac_end.inc \
+           noah_esm_snksrc_raw.inc noah_esm_hrt_sice1.inc noah_esm_hrt_sicek.inc \
+           noah_esm_snopac_exraw.inc \
+           noah_esm_snowpack_in.inc noah_esm_snowpack_pexp.inc \
+           noah_esm_snowpack_dsx.inc noah_esm_snowpack_wet.inc \
+           noah_esm_snowpack_out.inc
 $(B)/module_sf_noahlsm_esm.F: $(P)/module_sf_noahlsm.F noah_esm_state.inc noah_esm_penman.inc noah_esm_nopac.inc $(COLD_INC) noah_cold_splice.py | $(B)
 	sed -e 's|^CONTAINS$$|#include "noah_esm_state.inc"\n&|' \
 	    -e 's|^\t\t       ALBEDO,SOLDN,FVB,GAMA,STC(1),ETPN,FLX4,UA_PHYS)$$|&\n#include "noah_esm_penman.inc"|' \

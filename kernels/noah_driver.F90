@@ -98,6 +98,13 @@ program noah_driver
   ESM_FRZ_CLAMP = -1; ESM_SNO_EX_RAW = 0.0; ESM_SNO_ESD_IN = 0.0
   ESM_SNO_MELT_BLOCK = 0; ESM_FRZ_SICE = 0.0; ESM_FRZ_SH2O_HRT = 0.0
   ESM_FRZ_SH2O_IN(1:nsoil) = sh2o(1:nsoil)
+  ESM_SNP_CALLED = 0; ESM_SNP_DSX_CLAMP = -1; ESM_SNP_WET = 0
+  ESM_SNP_SNOWH_IN = 0.0; ESM_SNP_SNDENS_IN = 0.0; ESM_SNP_ESD = 0.0
+  ESM_SNP_TSNOW = 0.0; ESM_SNP_TSOIL = 0.0; ESM_SNP_DTSEC = 0.0
+  ESM_SNP_TAVGC = 0.0; ESM_SNP_ESDCX = 0.0; ESM_SNP_BFAC = 0.0
+  ESM_SNP_PEXP = 0.0; ESM_SNP_PEXP_M1 = 0.0; ESM_SNP_DSX_RAW = 0.0
+  ESM_SNP_DSX = 0.0; ESM_SNP_DW = 0.0; ESM_SNP_SNDENS_WETRAW = 0.0
+  ESM_SNP_SNDENS_OUT = 0.0; ESM_SNP_SNOWH_OUT = 0.0
 
   call SFLX(IILOC=iiloc, JJLOC=jjloc, FFROZP=ffrozp, ISURBAN=isurban, DT=dt, ZLVL=zlvl, NSOIL=nsoil, &
        SLDPTH=sldpth, LOCAL=local, LLANDUSE=llanduse, LSOIL=lsoil, LWDN=lwdn, SOLDN=soldn, SOLNET=solnet, &
@@ -183,5 +190,27 @@ program noah_driver
   call esm_dump_var('sno_melt_block', ESM_SNO_MELT_BLOCK)
   call esm_dump_var('frz_sice', ESM_FRZ_SICE(1:nsoil))
   call esm_dump_var('frz_sh2o_hrt', ESM_FRZ_SH2O_HRT(1:nsoil))
+  ! SNOWPACK (compaction): arguments at entry, the series sum before WRF adds 1,
+  ! the clamp decisions and what the routine returns.
+  call esm_dump_var('snp_called', ESM_SNP_CALLED)
+  call esm_dump_var('snp_snowh_in', ESM_SNP_SNOWH_IN)
+  call esm_dump_var('snp_sndens_in', ESM_SNP_SNDENS_IN)
+  call esm_dump_var('snp_esd', ESM_SNP_ESD)
+  call esm_dump_var('snp_tsnow', ESM_SNP_TSNOW)
+  call esm_dump_var('snp_tsoil', ESM_SNP_TSOIL)
+  call esm_dump_var('snp_dtsec', ESM_SNP_DTSEC)
+  call esm_dump_var('snp_tavgc', ESM_SNP_TAVGC)
+  call esm_dump_var('snp_esdcx', ESM_SNP_ESDCX)
+  call esm_dump_var('snp_bfac', ESM_SNP_BFAC)
+  call esm_dump_var('snp_pexp', ESM_SNP_PEXP)
+  call esm_dump_var('snp_pexp_m1', ESM_SNP_PEXP_M1)
+  call esm_dump_var('snp_dsx_raw', ESM_SNP_DSX_RAW)
+  call esm_dump_var('snp_dsx', ESM_SNP_DSX)
+  call esm_dump_var('snp_dsx_clamp', ESM_SNP_DSX_CLAMP)
+  call esm_dump_var('snp_wet', ESM_SNP_WET)
+  call esm_dump_var('snp_dw', ESM_SNP_DW)
+  call esm_dump_var('snp_sndens_wetraw', ESM_SNP_SNDENS_WETRAW)
+  call esm_dump_var('snp_sndens_out', ESM_SNP_SNDENS_OUT)
+  call esm_dump_var('snp_snowh_out', ESM_SNP_SNOWH_OUT)
   call esm_dump_close()
 end program noah_driver

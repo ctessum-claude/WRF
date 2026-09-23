@@ -39,3 +39,22 @@
       INTEGER, DIMENSION(ESM_NSOIL_MAX) :: ESM_FRZ_CLAMP = -1
       REAL, DIMENSION(ESM_NSOIL_MAX) :: ESM_FRZ_SICE = 0.0
       REAL, DIMENSION(ESM_NSOIL_MAX) :: ESM_FRZ_SH2O_HRT = 0.0
+!     SNOWPACK (Koren's approximate solution of Anderson's compaction equation):
+!     its arguments at entry and the pieces of the density update.  SNOWPACK is
+!     an in-place sub-step, so what a component can be referenced against is the
+!     series sum ESM_SNP_PEXP_M1 (the whole compaction signal, at full precision
+!     before WRF adds 1 to it) and the two clamp decisions -- not a difference of
+!     densities, which is O(dt) against a density of order 0.2.
+      REAL :: ESM_SNP_SNOWH_IN = 0.0, ESM_SNP_SNDENS_IN = 0.0
+      REAL :: ESM_SNP_ESD = 0.0, ESM_SNP_TSNOW = 0.0, ESM_SNP_TSOIL = 0.0
+      REAL :: ESM_SNP_DTSEC = 0.0, ESM_SNP_TAVGC = 0.0, ESM_SNP_ESDCX = 0.0
+      REAL :: ESM_SNP_BFAC = 0.0, ESM_SNP_PEXP = 0.0, ESM_SNP_PEXP_M1 = 0.0
+      REAL :: ESM_SNP_DSX_RAW = 0.0, ESM_SNP_DSX = 0.0, ESM_SNP_DW = 0.0
+      REAL :: ESM_SNP_SNDENS_WETRAW = 0.0
+      REAL :: ESM_SNP_SNDENS_OUT = 0.0, ESM_SNP_SNOWH_OUT = 0.0
+!     0 = SNOWPACK not called (no pack left), 1 = called
+      INTEGER :: ESM_SNP_CALLED = 0
+!     0 = neither density limit fired, 1 = capped at 0.40, 2 = floored at 0.05
+      INTEGER :: ESM_SNP_DSX_CLAMP = -1
+!     1 = the melt-water retention branch (TSNOWC >= 0) ran
+      INTEGER :: ESM_SNP_WET = 0

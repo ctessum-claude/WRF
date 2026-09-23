@@ -40,6 +40,16 @@ SPLICES = [
      "noah_esm_snopac_melt.inc", "after"),
     ("  END SUBROUTINE SNOPAC",
      "noah_esm_snopac_end.inc", "before"),
+    ("      TSOILC = TSOIL -273.15",
+     "noah_esm_snowpack_in.inc", "after"),
+    ("      PEXP = PEXP + 1.",
+     "noah_esm_snowpack_pexp.inc", "before"),
+    ("      IF (DSX < 0.05) DSX = 0.05",
+     "noah_esm_snowpack_dsx.inc", "after"),
+    ("         SNDENS = SNDENS * (1. - DW) + DW",
+     "noah_esm_snowpack_wet.inc", "after"),
+    ("  END SUBROUTINE SNOWPACK",
+     "noah_esm_snowpack_out.inc", "before"),
 ]
 
 def main(src, dst):
