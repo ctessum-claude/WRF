@@ -594,6 +594,11 @@
 	    call esm_dump_var('rate_coag_vol', esm_rate_coag_vol(1:max(esm_nbin,1),1:max(esm_ncomp_coag,1),kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('rate_cond_nonvol', esm_rate_cond_nonvol(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('rate_cond_semivol', esm_rate_cond_semivol(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('mtc_kg', esm_mtc_kg(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('mtc_dpwet', esm_mtc_dpwet(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('mtc_num', esm_mtc_num(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('mtc_t_k', esm_mtc_tk(kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('mtc_p_atm', esm_mtc_patm(kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('moist_out', moist(it,kts:kte,jt,:)); call esm_dump_var('chem_out', chem(it,kts:kte,jt,:))
 	    call esm_dump_close()
 	end if

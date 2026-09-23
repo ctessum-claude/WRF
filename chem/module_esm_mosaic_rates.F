@@ -64,6 +64,18 @@
       real, save :: esm_rate_cond_nonvol(esm_maxgas, esm_maxbin, esm_maxk)
       real, save :: esm_rate_cond_semivol(esm_maxgas, esm_maxbin, esm_maxk)
 
+!   the mass-transfer coefficients ASTEM condenses with, and the two per-bin
+!   quantities they are built from, recorded right after aerosolmtc:
+!     esm_mtc_kg     kg(iv,ibin), 1/s
+!     esm_mtc_dpwet  dp_wet_a(ibin), the wet diameter calc_dry_n_wet_aerosol_props
+!                    gives, cm
+!     esm_mtc_num    num_a(ibin), particles/cm3
+!     esm_mtc_tk     t_k (K) and esm_mtc_patm p_atm (atm) of the cell
+      real, save :: esm_mtc_kg(esm_maxgas, esm_maxbin, esm_maxk)
+      real, save :: esm_mtc_dpwet(esm_maxbin, esm_maxk)
+      real, save :: esm_mtc_num(esm_maxbin, esm_maxk)
+      real, save :: esm_mtc_tk(esm_maxk), esm_mtc_patm(esm_maxk)
+
 !   shapes actually used, so a consumer does not have to guess
       integer, save :: esm_nbin = 0, esm_ncomp_coag = 0, esm_ngas = 0
 !   MOSAIC's gas indices, dumped with the rates
@@ -80,6 +92,11 @@
       esm_rate_coag_vol    = 0.0
       esm_rate_cond_nonvol = 0.0
       esm_rate_cond_semivol = 0.0
+      esm_mtc_kg = 0.0
+      esm_mtc_dpwet = 0.0
+      esm_mtc_num = 0.0
+      esm_mtc_tk = 0.0
+      esm_mtc_patm = 0.0
       end subroutine esm_rates_reset
 
       end module module_esm_mosaic_rates

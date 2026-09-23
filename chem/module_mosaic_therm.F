@@ -5053,6 +5053,26 @@
       call aerosolmtc(vbs_nbin)
       if (istat_mosaic_fe1 .lt. 0) return
 
+! EarthSciML instrumentation: the mass-transfer coefficients ASTEM is about to
+! condense with, and the two per-bin quantities aerosolmtc builds them from.
+! kg is not recoverable from the condensation rates alone -- those are
+! gas*kg -- so it is recorded here rather than inferred.
+      if (esm_rate_on) then
+        do ibin = 1, nbin_a
+          if (jaerosolstate(ibin) .ne. no_aerosol) then
+            esm_mtc_dpwet(ibin,esm_rate_k) = real( dp_wet_a(ibin) )
+            esm_mtc_num(ibin,esm_rate_k)   = real( num_a(ibin) )
+            esm_mtc_kg(ih2so4_g,ibin,esm_rate_k) = real( kg(ih2so4_g,ibin) )
+            esm_mtc_kg(imsa_g,  ibin,esm_rate_k) = real( kg(imsa_g,ibin)   )
+            esm_mtc_kg(ihno3_g, ibin,esm_rate_k) = real( kg(ihno3_g,ibin)  )
+            esm_mtc_kg(ihcl_g,  ibin,esm_rate_k) = real( kg(ihcl_g,ibin)   )
+            esm_mtc_kg(inh3_g,  ibin,esm_rate_k) = real( kg(inh3_g,ibin)   )
+          end if
+        end do
+        esm_mtc_tk(esm_rate_k)   = real( t_k )
+        esm_mtc_patm(esm_rate_k) = real( p_atm )
+      end if
+
 ! condense h2so4, msa, and nh3 only
       call ASTEM_non_volatiles(dtchem)	! analytical solution
       if (istat_mosaic_fe1 .lt. 0) return
