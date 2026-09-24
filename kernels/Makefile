@@ -43,10 +43,8 @@ $(B)/mp_wsm6.o: $(M)/mp_wsm6.F90 $(B)/ccpp_kind_types.o $(B)/module_libmassv.o $
 
 # New Tiedtke: a build-time copy of the kernel with ntiedtke_esm_inner.inc
 # spliced in after the cumastrn call (the physics_mmm source stays untouched)
-$(B)/cu_ntiedtke_esm.F90: $(M)/cu_ntiedtke.F90 ntiedtke_esm_inner.inc | $(B)
-	sed -e 's/^ *use cu_ntiedtke_common$$/&\n use module_esm_dump/' \
-	    -e '/^     &     scale_fac, scale_fac2)$$/{n;s/^!$$/#include "ntiedtke_esm_inner.inc"\n!/}' $< > $@
-	grep -q 'ntiedtke_esm_inner.inc' $@
+$(B)/cu_ntiedtke_esm.F90: $(M)/cu_ntiedtke.F90 ntiedtke_esm_inner.inc ntiedtke_esm_patch.py | $(B)
+	python3 ntiedtke_esm_patch.py $< $@
 $(B)/cu_ntiedtke.o: $(B)/cu_ntiedtke_esm.F90 $(B)/ccpp_kind_types.o $(B)/module_esm_dump.o
 	$(FC) $(FFLAGS) -I. -J$(B) -I$(B) -c $< -o $@
 

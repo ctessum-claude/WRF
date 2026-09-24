@@ -15,7 +15,9 @@ program ntiedtke_driver
   use ccpp_kind_types, only: kind_phys
   use esm_flat_input
   use module_esm_dump
-  use cu_ntiedtke, only: cu_ntiedtke_init, cu_ntiedtke_run
+  use cu_ntiedtke, only: cu_ntiedtke_init, cu_ntiedtke_run, &
+                         adj_n, adj_kcall, adj_kk, adj_flag, adj_psp, adj_t0, adj_q0, &
+                         adj_tm, adj_qm, adj_t1, adj_q1
   implicit none
   character(len=1024) :: inpath, outpath, dtstr
   character(len=512) :: errmsg
@@ -82,6 +84,14 @@ program ntiedtke_driver
   call esm_dump_var('rthcuten', rthcuten); call esm_dump_var('rqvcuten', rqvcuten)
   call esm_dump_var('rqccuten', rqccuten); call esm_dump_var('rqicuten', rqicuten)
   call esm_dump_var('rucuten', rucuten); call esm_dump_var('rvcuten', rvcuten)
+  ! the cuadjtqn tape: every moist-adjustment call of this step, trimmed to the
+  ! calls that actually happened (adj_n of them)
+  call esm_dump_var('adj_n', adj_n)
+  call esm_dump_var('adj_kcall', adj_kcall(1:adj_n)); call esm_dump_var('adj_kk', adj_kk(1:adj_n))
+  call esm_dump_var('adj_flag', adj_flag(1:adj_n,:)); call esm_dump_var('adj_psp', adj_psp(1:adj_n,:))
+  call esm_dump_var('adj_t0', adj_t0(1:adj_n,:)); call esm_dump_var('adj_q0', adj_q0(1:adj_n,:))
+  call esm_dump_var('adj_tm', adj_tm(1:adj_n,:)); call esm_dump_var('adj_qm', adj_qm(1:adj_n,:))
+  call esm_dump_var('adj_t1', adj_t1(1:adj_n,:)); call esm_dump_var('adj_q1', adj_q1(1:adj_n,:))
   call esm_dump_var('errflg', errflg)
   call esm_dump_close()
 end program ntiedtke_driver
