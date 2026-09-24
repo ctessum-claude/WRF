@@ -210,6 +210,25 @@ sub("""!-----------------------------------------------------------
 !-----------------------------------------------------------
 ! next, let's check the deep convection""")
 
+# ------------------------------------------------- the cuflxn stage boundary
+sub("""!*    8.0      update tendencies for t and q in subroutine cudtdq""",
+    """      if (esm_dump_inner) then
+        call esm_dump_var('fx_pmflxr', pmflxr); call esm_dump_var('fx_pmflxs', pmflxs)
+        call esm_dump_var('fx_pdmfup', zdmfup); call esm_dump_var('fx_pdmfdp', zdmfdp)
+        call esm_dump_var('fx_pdpmel', zdpmel); call esm_dump_var('fx_plglac', zlglac)
+        call esm_dump_var('fx_prain', prain); call esm_dump_var('fx_pmfu', pmfu)
+        call esm_dump_var('fx_pmfd', pmfd); call esm_dump_var('fx_pmfus', zmfus)
+        call esm_dump_var('fx_pmfds', zmfds); call esm_dump_var('fx_pmfuq', zmfuq)
+        call esm_dump_var('fx_pmfdq', zmfdq); call esm_dump_var('fx_pmful', zmful)
+        call esm_dump_var('fx_plude', plude); call esm_dump_var('fx_pqsen', pqsen(1:klon*klev))
+        call esm_dump_var('fx_kcbot', kcbot); call esm_dump_var('fx_kctop', kctop)
+        call esm_dump_var('fx_ktopm2', itopm2); call esm_dump_var('fx_pten', pten)
+        call esm_dump_var('fx_pqen', pqen); call esm_dump_var('fx_paph', paph)
+        call esm_dump_var('fx_pap', pap); call esm_dump_var('fx_lndj', lndj)
+      endif
+
+!*    8.0      update tendencies for t and q in subroutine cudtdq""")
+
 # ------------------------------------------- the existing inner cumastrn dump
 sub("""     &     scale_fac, scale_fac2)
 !
