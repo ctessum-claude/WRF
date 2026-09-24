@@ -157,6 +157,35 @@ sub("""      end if
       return
       end subroutine cuadjtqn""")
 
+# --------------------------------------------------- the cuinin stage boundary
+# cuinin's outputs are cumastrn locals that cuascn and the rest overwrite many
+# times, so they have to be read where they are produced.
+sub("""     &     plude,    ilab)
+
+!----------------------------------
+!*    3.0   cloud base calculations
+!----------------------------------""", """     &     plude,    ilab)
+
+      if (esm_dump_inner) then
+        call esm_dump_var('ci_pten', pten); call esm_dump_var('ci_pqen', pqen)
+        call esm_dump_var('ci_pqsen', pqsen(1:klon*klev))
+        call esm_dump_var('ci_puen', puen); call esm_dump_var('ci_pven', pven)
+        call esm_dump_var('ci_pverv', pverv); call esm_dump_var('ci_pgeo', pgeo)
+        call esm_dump_var('ci_paph', paph); call esm_dump_var('ci_pgeoh', zgeoh)
+        call esm_dump_var('ci_ztenh', ztenh); call esm_dump_var('ci_zqenh', zqenh)
+        call esm_dump_var('ci_zqsenh', zqsenh); call esm_dump_var('ci_ilwmin', ilwmin)
+        call esm_dump_var('ci_ptu', ptu); call esm_dump_var('ci_pqu', pqu)
+        call esm_dump_var('ci_ztd', ztd); call esm_dump_var('ci_zqd', zqd)
+        call esm_dump_var('ci_plu', plu)
+        call esm_dump_var('ci_zuu', zuu); call esm_dump_var('ci_zvu', zvu)
+        call esm_dump_var('ci_zud', zud); call esm_dump_var('ci_zvd', zvd)
+        call esm_dump_var('ci_ilab', ilab)
+      endif
+
+!----------------------------------
+!*    3.0   cloud base calculations
+!----------------------------------""")
+
 # ------------------------------------------- the existing inner cumastrn dump
 sub("""     &     scale_fac, scale_fac2)
 !
