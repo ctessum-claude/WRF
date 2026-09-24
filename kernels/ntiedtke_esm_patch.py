@@ -186,6 +186,30 @@ sub("""     &     plude,    ilab)
 !*    3.0   cloud base calculations
 !----------------------------------""")
 
+# ------------------------------- the shallow test-parcel ascent inside cutypen
+# The shallow phase's arrays are reused and overwritten by the deep phase that
+# follows it in the same routine, so they have to be read where they are left.
+sub("""!-----------------------------------------------------------
+! next, let's check the deep convection""", """      if (esm_dump_inner) then
+        call esm_dump_var('sh_dh', dh); call esm_dump_var('sh_dhen', dhen)
+        call esm_dump_var('sh_ptu', ptu); call esm_dump_var('sh_pqu', pqu)
+        call esm_dump_var('sh_plu', plu); call esm_dump_var('sh_kup', kup)
+        call esm_dump_var('sh_vptu', vptu); call esm_dump_var('sh_vten', vten)
+        call esm_dump_var('sh_zbuo', zbuo); call esm_dump_var('sh_abuoy', abuoy)
+        call esm_dump_var('sh_klab', klab); call esm_dump_var('sh_eta', eta)
+        call esm_dump_var('sh_dz', dz); call esm_dump_var('sh_coef', coef)
+        call esm_dump_var('sh_kcbot', kcbot); call esm_dump_var('sh_kctop', kctop)
+        call esm_dump_var('sh_ktype', ktype); call esm_dump_var('sh_wbase', wbase)
+        call esm_dump_var('sh_ptenh', ptenh); call esm_dump_var('sh_pqenh', pqenh)
+        call esm_dump_var('sh_pgeoh', pgeoh); call esm_dump_var('sh_paph', paph)
+        call esm_dump_var('sh_pgeo', pgeo); call esm_dump_var('sh_pten', pten)
+        call esm_dump_var('sh_pqen', pqen); call esm_dump_var('sh_pap', pap)
+        call esm_dump_var('sh_hfx', hfx); call esm_dump_var('sh_qfx', qfx)
+      endif
+
+!-----------------------------------------------------------
+! next, let's check the deep convection""")
+
 # ------------------------------------------- the existing inner cumastrn dump
 sub("""     &     scale_fac, scale_fac2)
 !
