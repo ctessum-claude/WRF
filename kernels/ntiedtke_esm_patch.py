@@ -210,6 +210,32 @@ sub("""!-----------------------------------------------------------
 !-----------------------------------------------------------
 ! next, let's check the deep convection""")
 
+# ------------------- inside cuflxn: the state the precipitation sweeps start from
+# Blocks 1 and 1a of cuflxn zero pdmfup/pdmfdp outside the cloud and below the
+# downdraught, so the sweeps do NOT see the values cumastrn passed in.
+sub("""!*    2.            calculate rain/snow fall rates                             ""","""      if (esm_dump_inner) then
+        call esm_dump_var('pr_pdmfup', pdmfup); call esm_dump_var('pr_pdmfdp', pdmfdp)
+        call esm_dump_var('pr_plglac', plglac); call esm_dump_var('pr_pqsen', pqsen)
+        call esm_dump_var('pr_pmflxr', pmflxr); call esm_dump_var('pr_pmflxs', pmflxs)
+        call esm_dump_var('pr_pdpmel', pdpmel); call esm_dump_var('pr_rhevap', rhevap)
+        call esm_dump_var('pr_ktopm2', ktopm2)
+      endif
+!*    2.            calculate rain/snow fall rates                             """)
+
+# ---- immediately after the cuflxn CALL, before cumastrn's downdraught-rescaling
+# post-correction adds zmfuub back into the rain flux and recomputes zdmfup.
+sub("""     &  ,  prain,    pmfdde_rate, pmflxr, pmflxs )
+
+! some adjustments needed""", """     &  ,  prain,    pmfdde_rate, pmflxr, pmflxs )
+      if (esm_dump_inner) then
+        call esm_dump_var('cx_pmflxr', pmflxr); call esm_dump_var('cx_pmflxs', pmflxs)
+        call esm_dump_var('cx_pdmfup', zdmfup); call esm_dump_var('cx_pdmfdp', zdmfdp)
+        call esm_dump_var('cx_pdpmel', zdpmel); call esm_dump_var('cx_prain', prain)
+        call esm_dump_var('cx_pqsen', pqsen(1:klon*klev))
+      endif
+
+! some adjustments needed""")
+
 # ------------------------------------------------- the cuflxn stage boundary
 sub("""!*    8.0      update tendencies for t and q in subroutine cudtdq""",
     """      if (esm_dump_inner) then
