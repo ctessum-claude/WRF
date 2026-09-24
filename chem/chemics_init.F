@@ -148,6 +148,9 @@
    CHARACTER*256 :: message_txt
    TYPE(WRFU_TimeInterval) :: tmpTimeInterval
    integer :: i,j,k,l,numgas,ixhour,n,ndystep,kk,nv
+!  EarthSciML instrumentation: the ESM_RICH_IC switch (see CBMZ_MOSAIC_KPP below)
+   character(len=32) :: esm_rich_ic
+   integer :: esm_rich_stat
    real, DIMENSION (1,1) :: sza,cosszax
    real :: xtime,xhour,xmin,gmtp,xlonn,rlat
    logical :: is_moz_chm
@@ -809,6 +812,41 @@ CASE(GOCARTRACM_KPP,RACM_KPP,RACMPM_KPP,RACMSORG_KPP,RACM_MIM_KPP,RACM_ESRLSORG_
                 enddo
              enddo
           enddo
+!
+! EarthSciML instrumentation: an optional RICH initial profile.
+!
+! WRF-Chem's idealized gas profile leaves CBM-Z's aromatics, isoprene and
+! terpenes at the 1e-11 - 1e-13 ppb floor (the block just above sets API and LIM
+! to exactly zero), so on an idealized column those species and every radical and
+! product that descends from them -- TOL, XYL, CRES, TO2, CRO, OPEN, ARO1, ARO2,
+! ISOP, ISOPRD, ISOPP, ISOPN, ISOPO2, API, API1, API2, LIM, LIM1, LIM2, ANOL --
+! sit below one molecule per cubic centimetre for the whole run.  Their reaction
+! paths then carry no flux and a component test on them asserts their absence
+! rather than their chemistry.  ESM_RICH_IC=1 gives them mid-continental summer
+! daytime values instead, leaving everything else in the profile untouched, so
+! the two runs differ in exactly these seven initial mixing ratios.  Units are
+! ppmv, as everywhere in the WRF-Chem gas-phase chem array.  Inert unless the
+! environment variable is set.
+          call get_environment_variable('ESM_RICH_IC', esm_rich_ic, status=esm_rich_stat)
+          if (esm_rich_stat == 0 .and. len_trim(esm_rich_ic) > 0) then
+            if (trim(esm_rich_ic) /= '0') then
+              call wrf_message('EarthSciML: ESM_RICH_IC set -- aromatic, '// &
+                   'isoprene and terpene initial mixing ratios raised')
+              do j=jts,jte
+                 do k=kts,kte
+                    do i=its,ite
+                       chem(i,k,j,p_tol)  = 5.0e-4   ! toluene,    0.50 ppb
+                       chem(i,k,j,p_xyl)  = 3.0e-4   ! xylene,     0.30 ppb
+                       chem(i,k,j,p_csl)  = 1.0e-5   ! cresol,     0.01 ppb
+                       chem(i,k,j,p_iso)  = 2.0e-3   ! isoprene,   2.00 ppb
+                       chem(i,k,j,p_api)  = 5.0e-4   ! a-pinene,   0.50 ppb
+                       chem(i,k,j,p_lim)  = 2.0e-4   ! limonene,   0.20 ppb
+                       chem(i,k,j,p_c2h5oh) = 1.0e-3 ! ethanol,    1.00 ppb
+                    enddo
+                 enddo
+              enddo
+            endif
+          endif
         endif
         CASE (MOZART_MOSAIC_4BIN_KPP, MOZART_MOSAIC_4BIN_AQ_KPP)
         grid%vbs_nbin=0
