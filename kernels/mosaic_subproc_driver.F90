@@ -26,6 +26,8 @@ program mosaic_subproc_driver
   use module_data_mosaic_other
   use module_mosaic_newnuc, only: mosaic_newnuc_1clm
   use module_mosaic_coag, only: mosaic_coag_1clm
+  use module_esm_mosaic_rates, only: esm_rate_on, esm_coag_dpdry, esm_coag_dpwet, &
+       esm_coag_denswet, esm_coag_distrib, esm_coag_cbr
   implicit none
   character(len=1024) :: inpath, outpath, dtstr
   integer :: n, l, k, ll, nsize, ncomp, kbgn, kend, nk, stat, istat, ktau, ktauc
@@ -113,6 +115,11 @@ program mosaic_subproc_driver
   do k = 1, nk
     rsub_newnuc(:,k) = rsub(1:ltot2,kbgn+k-1,1)
   end do
+  ! record coagsolv's ENTRY state (the per-bin block of mosaic_coag_1clm) and
+  ! kernel, through the same hooks the in-model capture uses
+  esm_rate_on = .true.
+  esm_coag_dpdry = 0.0; esm_coag_dpwet = 0.0; esm_coag_denswet = 0.0
+  esm_coag_distrib = 0.0; esm_coag_cbr = 0.0
   call mosaic_coag_1clm(istat, 1, 1, kbgn, kend, flat_i0('idiagbb_dum'), dtchem, dtchem, &
        1, ktau, ktauc, 1, 1, 1, 1, 1, nk)
   do k = 1, nk
@@ -124,6 +131,11 @@ program mosaic_subproc_driver
   call esm_dump_var('dtchem', dtchem); call esm_dump_var('istat', istat)
   call esm_dump_var('rsub_newnuc_replay', rsub_newnuc)
   call esm_dump_var('rsub_coag_replay', rsub_coag)
+  call esm_dump_var('coag_dpdry_replay', esm_coag_dpdry(1:nsize,kbgn:kend))
+  call esm_dump_var('coag_dpwet_replay', esm_coag_dpwet(1:nsize,kbgn:kend))
+  call esm_dump_var('coag_denswet_replay', esm_coag_denswet(1:nsize,kbgn:kend))
+  call esm_dump_var('coag_distrib_replay', esm_coag_distrib(1:nsize,1:ncomp+4,kbgn:kend))
+  call esm_dump_var('coag_cbr_replay', esm_coag_cbr(1:nsize,1:nsize,kbgn:kend))
   call esm_dump_close()
 
 contains
