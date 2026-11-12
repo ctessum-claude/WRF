@@ -1626,6 +1626,20 @@ BENCH_END(pbl_driver_tim)
 
          call Advance_state (grid = grid%fire_state, config_flags = grid%cfbm_namelist)
 
+           ! EarthSciML instrumentation: CFBM holds the fire-grid diagnostics in its own state type,
+           ! which WRF I/O never sees, so an ifire = 1 run records only the heat/moisture feedback on
+           ! the atmospheric grid. Copy the fields that Registry/registry.fire declares for package
+           ! cfbm, so burned area, level set and ignition time reach the history files.
+         do j = grid%fire_state%jfps, grid%fire_state%jfpe
+           do i = grid%fire_state%ifps, grid%fire_state%ifpe
+             grid%fire_area(i, j)    = grid%fire_state%fire_area(i, j)
+             grid%lfn(i, j)          = grid%fire_state%lfn(i, j)
+             grid%tign_g(i, j)       = grid%fire_state%tign_g(i, j)
+             grid%fuel_frac(i, j)    = grid%fire_state%fuel_frac(i, j)
+             grid%flame_length(i, j) = grid%fire_state%flame_length(i, j)
+           end do
+         end do
+
          if (grid%fire_state%num_tiles == grid%num_tiles .and. &
             grid%cfbm_namelist%tile_strategy == config_flags%tile_strategy) then
            !$OMP PARALLEL DO   &
