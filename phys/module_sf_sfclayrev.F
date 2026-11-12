@@ -214,7 +214,7 @@
     ! EarthSciML instrumentation (module_esm_dump): every kernel input before
     ! the call, every output after it; inout arguments appear twice (<name>
     ! before, <name>_out after).  isftcflx/iz0tlnd are -1 when not present.
-    esm_dumping = esm_dump_want('sfclayrev')
+    esm_dumping = esm_dump_want('sfclayrev', j=j, its=its, ite=ite)
     if(esm_dumping) then
        call esm_dump_open('sfclayrev')
        call esm_dump_var('j', j); call esm_dump_var('its', its); call esm_dump_var('ite', ite)

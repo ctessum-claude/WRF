@@ -406,7 +406,7 @@
 !
       ! EarthSciML instrumentation (module_esm_dump): dump every kernel input
       ! for this tile before the call, every output after it.
-      esm_dumping = esm_dump_want('ysu')
+      esm_dumping = esm_dump_want('ysu', j=j, its=its, ite=ite)
       if (esm_dumping) then
          call esm_dump_open('ysu')
          call esm_dump_var('j', j)

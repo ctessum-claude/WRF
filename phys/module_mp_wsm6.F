@@ -150,7 +150,7 @@
 !--- EarthSciML instrumentation (module_esm_dump): kernel inputs before the
 !    call, outputs after (<name>_out); esm_dump_inner lets mp_wsm6_run (built
 !    with -DESM_DUMP) append its process rates to the same file.
-    esm_dumping = esm_dump_want('wsm6')
+    esm_dumping = esm_dump_want('wsm6', j=j, its=its, ite=ite)
     if(esm_dumping) then
        call esm_dump_open('wsm6')
        call esm_dump_var('j', j); call esm_dump_var('its', its); call esm_dump_var('ite', ite)

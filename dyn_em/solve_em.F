@@ -383,6 +383,10 @@ SUBROUTINE solve_em ( grid , config_flags  &
    IF (config_flags%nwp_diagnostics == 1) diag_flag = .true.
 
    grid%itimestep = grid%itimestep + 1
+   ! EarthSciML instrumentation (module_esm_dump): tell the dump gating which
+   ! domain and step the physics below belongs to (ESM_DUMP_DOMAIN / _STEPS).
+   esm_dump_domain = grid%id
+   esm_dump_step = grid%itimestep
    grid%dtbc = grid%dtbc + grid%dt
 
    IF( coupler_on ) CALL cpl_store_input( grid, config_flags )

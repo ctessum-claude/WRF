@@ -1880,7 +1880,7 @@ CONTAINS
    ! EarthSciML instrumentation (module_esm_dump): one dump per j-row.  Tile
    ! arrays in WRF order (k=1 bottom); the RRTM column arrays (k=1 top, P in
    ! hPa) and RRTM's internal fluxes are appended for column i=its.
-   esm_dumping = esm_dump_want('rrtm')
+   esm_dumping = esm_dump_want('rrtm', j=j, its=its, ite=ite)
    IF(esm_dumping) THEN
       CALL esm_dump_open('rrtm')
       CALL esm_dump_var('j', j); CALL esm_dump_var('its', its); CALL esm_dump_var('ite', ite)

@@ -177,7 +177,7 @@ CONTAINS
 
       ! EarthSciML instrumentation (module_esm_dump): inputs before the call,
       ! outputs after (<name>_out); SLAB1D appends its diagnostics (esm_dump_inner).
-      esm_dumping = esm_dump_want('slab')
+      esm_dumping = esm_dump_want('slab', j=j, its=its, ite=ite)
       IF(esm_dumping) THEN
          CALL esm_dump_open('slab')
          CALL esm_dump_var('j', j); CALL esm_dump_var('its', its); CALL esm_dump_var('ite', ite)

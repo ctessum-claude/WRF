@@ -118,7 +118,7 @@ CONTAINS
    ! EarthSciML instrumentation (module_esm_dump): one dump per j-row (= one
    ! call).  Tile arrays are in WRF order (k=1 bottom); SWPARA's own arrays
    ! (k=1 top) are appended for column i=its via esm_dump_inner.
-   esm_dumping = esm_dump_want('sw')
+   esm_dumping = esm_dump_want('sw', j=j, its=its, ite=ite)
    IF(esm_dumping) THEN
       CALL esm_dump_open('sw')
       CALL esm_dump_var('j', j); CALL esm_dump_var('its', its); CALL esm_dump_var('ite', ite)
