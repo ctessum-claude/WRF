@@ -29,6 +29,12 @@
 !           electrolyte(:, jtotal) as the column call had it (the column's
 !           ASTEM can move aer(:, jtotal) between its conform and the phase
 !           state call, so re-forming them is not exact)
+!   mode 6: ASTEM's semi-volatile partitioning on the bin (EqWeFiC ASTEM tape):
+!           as mode 2 (conform_electrolytes, aerosol_phase_state), then a line
+!           "g(1:5)" sets gas(1:5) (h2so4 hno3 hcl nh3 msa, nmol/m3), aerosolmtc
+!           forms kg from the bin, and ASTEM_semi_volatiles(60 s) runs with the
+!           ASTEM tape on (fourth argument: the ASTEM tape file); its FXO record
+!           is the bin's surface equilibrium at that state.
 ! An optional third argument names a MESA tape file: mesa_ptc then writes
 ! every iteration through module_esm_mesa_tape (esm_mp_*; case = case index).
 ! relhum and t_k are read as default REAL (the model's relhumclm and rsub are
@@ -44,7 +50,8 @@ program mosaic_therm_driver
   use module_mosaic_therm
   use module_esm_mesa_tape
   implicit none
-  character(len=1024) :: inpath, outpath, tapepath, line
+  character(len=1024) :: inpath, outpath, tapepath, line, atpath
+  real(kind=8) :: g5(5), dt8
   real(kind=8) :: rh8
   integer :: ncase, ic, mode, nnz, i, ia, jh, vbs(1), islot
   real :: tk4, rh4, patm4
@@ -58,6 +65,13 @@ program mosaic_therm_driver
     esm_mp_unit = 77
     open(esm_mp_unit, file=trim(tapepath), status='replace')
     esm_mp_on = .true.
+  endif
+  atpath = ''
+  if (command_argument_count() >= 4) call get_command_argument(4, atpath)
+  if (len_trim(atpath) > 0) then
+    esm_at_unit = 79
+    open(esm_at_unit, file=trim(atpath), status='replace')
+    esm_at_file = .true.
   endif
   open(10, file=trim(inpath), status='old')
   read(10,*) ncase
@@ -110,7 +124,21 @@ program mosaic_therm_driver
         aer(ia,jtotal,1) = aer(ia,jtotal,1) + v
       enddo
     endif
-    if (mode == 1 .or. mode == 3) then
+    if (mode == 6) then
+      read(10,*) g5
+      call aerosol_phase_state(1)
+      gas(1:5) = g5
+      if (jaerosolstate(1) /= no_aerosol) then
+        call aerosolmtc(vbs)
+        esm_at_on = esm_at_file
+        ncorecnt_aer = -1; kclm_aer = ic   ! tape header: step -1 marks a driver case
+        dt8 = 60.0d0
+        call esm_at_ain(dt8)
+        call overall_massbal_in
+        call ASTEM_semi_volatiles(dt8)
+        esm_at_on = .false.
+      endif
+    else if (mode == 1 .or. mode == 3) then
       ah2o_a(1) = rh4
       do i = 1, nelectrolyte
         molality0(i) = bin_molality(i,1)
@@ -124,6 +152,7 @@ program mosaic_therm_driver
   enddo
   close(10)
   if (esm_mp_on) close(esm_mp_unit)
+  if (esm_at_file) close(esm_at_unit)
 
   call esm_dump_open_file('mosaic_therm', trim(outpath))
   call esm_dump_var('ncase', ncase)

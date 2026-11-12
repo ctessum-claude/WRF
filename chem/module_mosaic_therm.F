@@ -5097,6 +5097,12 @@
         esm_mtc_patm(esm_rate_k) = real( p_atm )
       end if
 
+! EarthSciML instrumentation: the ASTEM tape (module_esm_mesa_tape), on for a
+! dumped column when ESM_ASTEM_TAPE names a file
+      call esm_at_open()
+      esm_at_on = esm_at_file .and. esm_rate_on
+      call esm_at_ain(dtchem)
+
 ! condense h2so4, msa, and nh3 only
       call ASTEM_non_volatiles(dtchem)	! analytical solution
       if (istat_mosaic_fe1 .lt. 0) return
@@ -5805,6 +5811,7 @@
 ! overall integration loop begins over dtchem seconds
 
 10    isteps_ASTEM = isteps_ASTEM + 1
+      call esm_at_svt(isteps_ASTEM, t_old)
 
 ! compute new fluxes
       phi_nh4no3_s = 0.0
@@ -5832,18 +5839,26 @@
 
         if(jaerosolstate(ibin) .eq. all_solid)then
           jphase(ibin) = jsolid
+          call esm_at_fxi(ibin, 1)
           call ASTEM_flux_dry(ibin)
+          call esm_at_fxo(ibin, 1)
         elseif(jaerosolstate(ibin) .eq. all_liquid)then
           jphase(ibin) = jliquid
+          call esm_at_fxi(ibin, 2)
           call ASTEM_flux_wet(ibin)
+          call esm_at_fxo(ibin, 2)
         elseif(jaerosolstate(ibin) .eq. mixed)then
 
           if( electrolyte(jnh4no3,jsolid,ibin).gt. 0.0 .or. &
               electrolyte(jnh4cl, jsolid,ibin).gt. 0.0 )then
+            call esm_at_fxi(ibin, 3)
             call ASTEM_flux_mix(ibin)	! jphase(ibin) will be determined in this subr.
+            call esm_at_fxo(ibin, 3)
           else
             jphase(ibin) = jliquid
+            call esm_at_fxi(ibin, 4)
             call ASTEM_flux_wet(ibin)
+            call esm_at_fxo(ibin, 4)
           endif
 
         endif
@@ -6006,7 +6021,8 @@
 ! check if end of dtchem reached
       if(t_new .lt. 0.9999*t_out) goto 10
 
-30    nsteps_astem = nsteps_astem + isteps_astem		! cumulative steps
+30    call esm_at_aout(isteps_astem)
+      nsteps_astem = nsteps_astem + isteps_astem		! cumulative steps
       nsteps_astem_max = max(nsteps_astem_max, isteps_astem)	! max steps in a dtchem time-step
 
 !================================================
@@ -8326,7 +8342,8 @@
 
 
 ! recompute phase equilibrium
-100   if(iupdate_phase_state .eq. mYES)then
+100   continue
+      if(iupdate_phase_state .eq. mYES)then
         do ibin = 1, nbin_a
           if(jaerosolstate(ibin) .ne. no_aerosol)then
             call conform_electrolytes(jtotal,ibin,XT)

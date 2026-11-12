@@ -38,6 +38,8 @@
       logical, save :: esm_mp_on = .false.
       integer, save :: esm_mp_unit = 0, esm_mp_case = 0, esm_mp_call = 0
       integer, save :: esm_mp_it = 0
+      logical, save :: esm_at_on = .false., esm_at_file = .false.
+      integer, save :: esm_at_unit = 0, esm_at_sub = 0
       character(len=*), parameter :: esm_mp_fmt = '(a,3(1x,i0),*(1x,es24.16e3))'
 
       contains
@@ -121,5 +123,138 @@
         electrolyte(1:nelectrolyte,jsolid,ibin), electrolyte(1:nelectrolyte,jliquid,ibin), &
         vs, vl, epercent(1:nelectrolyte,jsolid,ibin)
       end subroutine esm_mp_exit
+
+!=======================================================================
+! ASTEM tape (2026-11-12): MOSAIC's gas-particle partitioning solver,
+! SUBROUTINE ASTEM and its stages, recorded at each stage's OWN exit
+! (EqWeFiC N113).  Inert unless esm_at_on; the model turns it on for a
+! dumped column (esm_rate_on) only when the environment variable
+! ESM_ASTEM_TAPE names a file (esm_at_open), and the therm driver may set it
+! directly.  Same text layout as the MESA tape, header
+!   TAG step lev sub bin v1 v2 ...
+! with step = ncorecnt_aer, lev = kclm_aer, sub = ASTEM sub-step (0 before
+! the semi-volatile loop), bin = ibin (0 for whole-box records).
+! Ions (9) as esm_mp_ions; G = gas(1:ngas_ioa); E = electrolyte(1:22,jp).
+!   AIN   after aerosolmtc: dtchem t_k p_atm rh_pc ah2o keq_gl(4) keq_ll(3)
+!         kp_nh4no3 kp_nh4cl G kp_nh4no3_0 kp_nh4cl_0 keq_sg(1:2)
+!   BIN   (per bin, same point) jaerosolstate jphase jhyst_leg num_a dp_wet_a
+!         water_a mass_dry_a kg(1:5) kel(1:5) ions(s) ions(l) ions(t)
+!         E(s) E(l) E(t) epercent(1:22,jtotal) aer(1:naer,jtotal)
+!   SB    (state per bin) jaerosolstate jphase jhyst_leg water_a ions(s)
+!         ions(l) ions(t) E(s) E(l) E(t)
+!   SVT   sub-step top (label 10): t_old G total_species(1:5); per bin SVB = SB
+!   (Only the PHYSICS is taped: the per-bin surface equilibria and driving
+!   forces where the fluxes are formed; ASTEM's step updates are not, because
+!   EqWeFiC does not transcribe the integrator.)
+!   FXI   per bin before its flux call: route(1 dry 2 wet 3 mix 4 mixed->wet) G
+!   FXO   per bin after: route jphase idry_case3a ieqblm sfc_a(1:5)
+!         df_gas_s df_gas_l flux_s flux_l Heff phi_volatile_s phi_volatile_l
+!         integrate(1:5,jsolid) integrate(1:5,jliquid) mc(1:4) ma(1:5)
+!         gam(1:22) gam_ratio activity(1:22) water_a keq_nh4no3 keq_nh4cl
+!         G ions(s) ions(l) ions(t) E(s) E(l) kel(1:5) epercent(1:22,jsolid)
+!         keq_nh4no3_0 keq_nh4cl_0
+!   AOUT  end of ASTEM_semi_volatiles: isteps G
+!=======================================================================
+      subroutine esm_at_open()
+      character(len=1024) :: path
+      integer :: st
+      logical, save :: tried = .false.
+      if (tried) return
+      tried = .true.
+      call get_environment_variable('ESM_ASTEM_TAPE', path, status=st)
+      if (st /= 0 .or. len_trim(path) == 0) return
+      esm_at_unit = 78
+      open(esm_at_unit, file=trim(path), status='replace')
+      esm_at_file = .true.
+      end subroutine esm_at_open
+
+      subroutine esm_at_hdr(tag, sub, ibin, v)
+      character(len=*) tag
+      integer sub, ibin
+      real(kind=8) v(:)
+      write(esm_at_unit, '(a,4(1x,i0),*(1x,es24.16e3))') tag, ncorecnt_aer, &
+        kclm_aer, sub, ibin, v
+      end subroutine esm_at_hdr
+
+      subroutine esm_at_ain(dtchem)
+      real(kind=8) dtchem
+      integer ibin
+      real(kind=8) vs(9), vl(9), vt(9)
+      if (.not. esm_at_on) return
+      esm_at_sub = 0
+      call esm_at_hdr('AIN', 0, 0, (/ dtchem, t_k, p_atm, rh_pc, ah2o, &
+        keq_gl(1:4), keq_ll(1:3), kp_nh4no3, kp_nh4cl, gas(1:ngas_ioa), &
+        kp_nh4no3_0, kp_nh4cl_0, keq_sg(1:2) /))
+      do ibin = 1, nbin_a
+        call esm_mp_ions(jsolid, ibin, vs); call esm_mp_ions(jliquid, ibin, vl)
+        call esm_mp_ions(jtotal, ibin, vt)
+        call esm_at_hdr('BIN', 0, ibin, (/ dble(jaerosolstate(ibin)), &
+          dble(jphase(ibin)), dble(jhyst_leg(ibin)), num_a(ibin), dp_wet_a(ibin), &
+          water_a(ibin), mass_dry_a(ibin), kg(1:ngas_ioa,ibin), kel(1:ngas_ioa,ibin), &
+          vs, vl, vt, electrolyte(1:nelectrolyte,jsolid,ibin), &
+          electrolyte(1:nelectrolyte,jliquid,ibin), electrolyte(1:nelectrolyte,jtotal,ibin), &
+          epercent(1:nelectrolyte,jtotal,ibin), aer(1:naer,jtotal,ibin) /))
+      end do
+      end subroutine esm_at_ain
+
+      subroutine esm_at_sb(tag, ibin)
+      character(len=*) tag
+      integer ibin
+      real(kind=8) vs(9), vl(9), vt(9)
+      call esm_mp_ions(jsolid, ibin, vs); call esm_mp_ions(jliquid, ibin, vl)
+      call esm_mp_ions(jtotal, ibin, vt)
+      call esm_at_hdr(tag, esm_at_sub, ibin, (/ dble(jaerosolstate(ibin)), &
+        dble(jphase(ibin)), dble(jhyst_leg(ibin)), water_a(ibin), vs, vl, vt, &
+        electrolyte(1:nelectrolyte,jsolid,ibin), electrolyte(1:nelectrolyte,jliquid,ibin), &
+        electrolyte(1:nelectrolyte,jtotal,ibin) /))
+      end subroutine esm_at_sb
+
+
+
+      subroutine esm_at_svt(isteps, t_old)
+      integer isteps, ibin
+      real(kind=8) t_old
+      if (.not. esm_at_on) return
+      esm_at_sub = isteps
+      call esm_at_hdr('SVT', isteps, 0, (/ t_old, gas(1:ngas_ioa), &
+        total_species(1:ngas_ioa) /))
+      do ibin = 1, nbin_a
+        call esm_at_sb('SVB', ibin)
+      end do
+      end subroutine esm_at_svt
+
+      subroutine esm_at_fxi(ibin, route)
+      integer ibin, route
+      if (.not. esm_at_on) return
+      call esm_at_hdr('FXI', esm_at_sub, ibin, (/ dble(route), gas(1:ngas_ioa) /))
+      end subroutine esm_at_fxi
+
+      subroutine esm_at_fxo(ibin, route)
+      integer ibin, route, iv
+      real(kind=8) vs(9), vl(9), vt(9)
+      if (.not. esm_at_on) return
+      call esm_mp_ions(jsolid, ibin, vs); call esm_mp_ions(jliquid, ibin, vl)
+      call esm_mp_ions(jtotal, ibin, vt)
+      call esm_at_hdr('FXO', esm_at_sub, ibin, (/ dble(route), dble(jphase(ibin)), &
+        dble(idry_case3a(ibin)), dble(ieqblm_astem), sfc_a(1:ngas_ioa), &
+        df_gas_s(1:ngas_ioa,ibin), df_gas_l(1:ngas_ioa,ibin), flux_s(1:ngas_ioa,ibin), &
+        flux_l(1:ngas_ioa,ibin), heff(1:ngas_ioa,ibin), phi_volatile_s(1:ngas_ioa,ibin), &
+        phi_volatile_l(1:ngas_ioa,ibin), (dble(integrate(iv,jsolid,ibin)), iv=1,ngas_ioa), &
+        (dble(integrate(iv,jliquid,ibin)), iv=1,ngas_ioa), mc(1:ncation,ibin), &
+        ma(1:nanion,ibin), gam(1:nelectrolyte,ibin), gam_ratio(ibin), &
+        activity(1:nelectrolyte,ibin), water_a(ibin), keq_nh4no3, keq_nh4cl, &
+        gas(1:ngas_ioa), vs, vl, vt, electrolyte(1:nelectrolyte,jsolid,ibin), &
+        electrolyte(1:nelectrolyte,jliquid,ibin), kel(1:ngas_ioa,ibin), &
+        epercent(1:nelectrolyte,jsolid,ibin), keq_nh4no3_0, keq_nh4cl_0 /))
+      end subroutine esm_at_fxo
+
+
+
+
+      subroutine esm_at_aout(isteps)
+      integer isteps
+      if (.not. esm_at_on) return
+      call esm_at_hdr('AOUT', isteps, 0, (/ dble(isteps), gas(1:ngas_ioa) /))
+      end subroutine esm_at_aout
 
       end module module_esm_mesa_tape
