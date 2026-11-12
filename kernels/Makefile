@@ -14,7 +14,7 @@ B = build
 P = ../phys
 M = ../phys/physics_mmm
 
-DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/ntiedtke_driver $(B)/noah_driver $(B)/cbmz_driver $(B)/mosaic_drydep_driver $(B)/mosaic_subproc_driver $(B)/wetdep_ls_driver $(B)/emissions_driver
+DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/ntiedtke_driver $(B)/noah_driver $(B)/cbmz_driver $(B)/mosaic_drydep_driver $(B)/mosaic_subproc_driver $(B)/wetdep_ls_driver $(B)/emissions_driver $(B)/coagsolv_rate_driver
 all: $(DRIVERS)
 
 $(B):
@@ -70,24 +70,38 @@ $(B)/mosaic_drydep_kernel.F90: $(C)/module_mosaic_drydep.F | $(B)
 	  sed -n '260,542p' $< | sed -e '/use module_configure/d' -e '/use module_mosaic_driver/d'; \
 	  echo 'end module mosaic_drydep_kernel' ) > $@
 	grep -q 'subroutine aerosol_depvel_2' $@
+# MOSAIC/frame modules are compiled from a COPY inside $(B) (2026-11-12).  WRF's
+# own build leaves real32 .mod files beside the sources (chem/*.mod, frame/*.mod),
+# and gfortran finds a module in the source file's directory before the -I path,
+# so a real64 (-fdefault-real-8) object compiled from ../chem/X.F used the REAL32
+# interface of every module X uses.  That silently wrote real32 values into
+# real64 storage: it is the "real64 build returns zero nucleation and a different
+# coagulation state" of mosaic_subproc_driver (EqWeFiC FORTRAN_BUGS N87).
 $(B)/module_peg_util.o: $(C)/module_peg_util.F | $(B)
-	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $< -o $@
+	cp $< $(B)/$(notdir $<)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $(B)/$(notdir $<) -o $@
 $(B)/stub_wrf_msg.o: stub_wrf_msg.F90 | $(B)
 	$(FC) $(FFLAGS) -J$(B) -c $< -o $@
 $(B)/module_data_mosaic_asect.o: $(C)/module_data_mosaic_asect.F | $(B)
-	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $< -o $@
+	cp $< $(B)/$(notdir $<)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $(B)/$(notdir $<) -o $@
 $(B)/module_data_mosaic_other.o: $(C)/module_data_mosaic_other.F | $(B)
-	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $< -o $@
+	cp $< $(B)/$(notdir $<)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $(B)/$(notdir $<) -o $@
 $(B)/mosaic_drydep_kernel.o: $(B)/mosaic_drydep_kernel.F90 $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o
 	$(FC) $(FFLAGS) $(PROMO) -ffixed-line-length-none -J$(B) -I$(B) -c $< -o $@
 $(B)/module_state_description.o: ../frame/module_state_description.F | $(B)
-	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $< -o $@
+	cp $< $(B)/$(notdir $<)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $(B)/$(notdir $<) -o $@
 $(B)/module_esm_mosaic_rates.o: $(C)/module_esm_mosaic_rates.F | $(B)
-	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $< -o $@
-$(B)/module_mosaic_newnuc.o: $(B)/module_esm_mosaic_rates.o $(C)/module_mosaic_newnuc.F $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o $(B)/module_state_description.o
-	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
-$(B)/module_mosaic_coag.o: $(B)/module_esm_mosaic_rates.o $(C)/module_mosaic_coag.F $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o $(B)/module_state_description.o
-	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
+	cp $< $(B)/$(notdir $<)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $(B)/$(notdir $<) -o $@
+$(B)/module_mosaic_newnuc.o: $(C)/module_mosaic_newnuc.F $(B)/module_esm_mosaic_rates.o $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o $(B)/module_state_description.o
+	cp $< $(B)/$(notdir $<)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $(B)/$(notdir $<) -o $@
+$(B)/module_mosaic_coag.o: $(C)/module_mosaic_coag.F $(B)/module_esm_mosaic_rates.o $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o $(B)/module_state_description.o
+	cp $< $(B)/$(notdir $<)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $(B)/$(notdir $<) -o $@
 MOSSUB = $(B)/module_esm_mosaic_rates.o $(B)/stub_wrf_msg.o $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o \
          $(B)/module_peg_util.o $(B)/module_state_description.o \
          $(B)/module_mosaic_newnuc.o $(B)/module_mosaic_coag.o
@@ -138,6 +152,11 @@ $(B)/mosaic_drydep_driver: mosaic_drydep_driver.F90 $(COMMON) $(MOSDD)
 	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
 
 $(B)/mosaic_subproc_driver: mosaic_subproc_driver.F90 $(COMMON) $(MOSSUB)
+	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
+
+# coagsolv alone, on the inputs recorded at its entry (fork f311091e); see the
+# driver header.  Real64 is the reference (FORTRAN_BUGS N117).
+$(B)/coagsolv_rate_driver: coagsolv_rate_driver.F90 $(COMMON) $(MOSSUB)
 	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
 
 # WRF-Chem large-scale wet deposition (wetscav_onoff < 0): chem/module_wetdep_ls.F
