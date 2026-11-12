@@ -8992,9 +8992,13 @@
 ! function
 !     real(kind=8) aerosol_water
 
+!   EarthSciML instrumentation: the inputs of this call, filed in slot 1 for
+!   the first call per (bin, level) of a dumped step and slot 2 for every later
+!   one (so slot 2 ends as the LAST call); outputs are filed at label 9990.
+      if (esm_rate_on) call esm_th_record_in(ibin)
 
       water_a(ibin) = aerosol_water(jliquid,ibin)	! kg/m^3(air)
-      if(water_a(ibin) .eq. 0.0)return
+      if(water_a(ibin) .eq. 0.0) goto 9990
 
 
       call calculate_xt(ibin,jliquid,xt)
@@ -9585,8 +9589,66 @@
 
 
 
+!   EarthSciML instrumentation: this call's outputs (see esm_th_record_in);
+!   the normal path falls through to here, the water = 0 exit jumps here
+9990  if (esm_rate_on) call esm_th_record_out(ibin)
       return
       end subroutine compute_activities
+
+
+
+!   EarthSciML instrumentation for compute_activities: file its inputs and
+!   outputs into module_esm_mosaic_rates (esm_th_*), see that module.
+      subroutine esm_th_record_in(ibin)
+      integer ibin, k, je, ja, jb
+      real(kind=8) xt_dum
+      k = esm_rate_k
+      if (k .lt. 1 .or. k .gt. esm_maxk) return
+      esm_th_ncall(ibin,k) = esm_th_ncall(ibin,k) + 1
+      esm_th_slot = min(esm_th_ncall(ibin,k), 2)
+      do je = 1, min(nelectrolyte, esm_maxel)
+        esm_th_elec(je,ibin,k,esm_th_slot) = electrolyte(je,jliquid,ibin)
+      enddo
+      do ja = 1, min(naer, esm_maxaer)
+        esm_th_aerl(ja,ibin,k,esm_th_slot) = aer(ja,jliquid,ibin)
+        esm_th_aert(ja,ibin,k,esm_th_slot) = aer(ja,jtotal,ibin)
+      enddo
+      esm_th_ah2o_a(ibin,k,esm_th_slot) = ah2o_a(ibin)
+      call calculate_xt(ibin,jliquid,xt_dum)
+      esm_th_xt(ibin,k,esm_th_slot) = xt_dum
+      esm_th_ah2o(k) = ah2o
+      esm_th_tk(k) = t_k
+      esm_th_keq_ll(1:3,k) = Keq_ll(1:3)
+      do jb = 1, min(nelectrolyte, esm_maxel)
+        do ja = 1, min(nelectrolyte, esm_maxel)
+          esm_th_log_gamz(ja,jb,k) = log_gamz(ja,jb)
+        enddo
+      enddo
+      esm_th_a_zsr(1:6,1:esm_maxel) = a_zsr(1:6,1:esm_maxel)
+      esm_th_b_zsr(1:esm_maxel) = b_zsr(1:esm_maxel)
+      esm_th_aw_min(1:esm_maxel) = aw_min(1:esm_maxel)
+      esm_th_b_mtem(1:6,1:esm_maxel,1:esm_maxel) = b_mtem(1:6,1:esm_maxel,1:esm_maxel)
+      do ja = 1, min(naer, esm_maxaer)
+        esm_th_kappa(ja) = kappa_nonelectro(ja)
+        esm_th_mw_aer(ja) = mw_aer_mac(ja)
+        esm_th_dens_aer(ja) = dens_aer_mac(ja)
+      enddo
+      esm_th_iaer = (/ iso4_a, ino3_a, icl_a, inh4_a, imsa_a, ina_a, ica_a /)
+      end subroutine esm_th_record_in
+
+      subroutine esm_th_record_out(ibin)
+      integer ibin, k, je
+      k = esm_rate_k
+      if (k .lt. 1 .or. k .gt. esm_maxk .or. esm_th_slot .lt. 1) return
+      esm_th_water(ibin,k,esm_th_slot) = water_a(ibin)
+      esm_th_gam_ratio(ibin,k,esm_th_slot) = gam_ratio(ibin)
+      esm_th_mc(1:4,ibin,k,esm_th_slot) = mc(1:4,ibin)
+      esm_th_ma(1:5,ibin,k,esm_th_slot) = ma(1:5,ibin)
+      do je = 1, min(nelectrolyte, esm_maxel)
+        esm_th_gam(je,ibin,k,esm_th_slot) = gam(je,ibin)
+        esm_th_act(je,ibin,k,esm_th_slot) = activity(je,ibin)
+      enddo
+      end subroutine esm_th_record_out
 
 
 

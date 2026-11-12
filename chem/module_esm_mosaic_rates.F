@@ -114,6 +114,47 @@
       real, save :: esm_coag_denswet(esm_maxbin, esm_maxk)
       real, save :: esm_coag_tk(esm_maxk), esm_coag_patm(esm_maxk)
 
+!   MOSAIC THERMODYNAMICS, compute_activities (module_mosaic_therm.F): its inputs
+!   and outputs at the FIRST and the LAST call per (bin, level) of a dumped step
+!   (slot 1 and slot 2), so the ZSR water, the MTEM mixing rule and the ionic
+!   equilibrium it performs can be referenced call by call.  The thermodynamics
+!   runs in real(kind=8), so these are real(kind=8) as well.  esm_th_* names:
+!       elec(je)    electrolyte(je, jliquid, ibin), nmol/m3(air)
+!       aerl/aert   aer(ja, jliquid|jtotal, ibin), nmol/m3(air)
+!       ah2o_a      ah2o_a(ibin), the Kelvin-adjusted water activity; ah2o (per
+!                   level) the ambient relative humidity
+!       water       water_a(ibin), kg/m3(air), set by aerosol_water(jliquid)
+!       mc, ma      cation/anion molalities, mol/kg(water)
+!       gam, act    gam(je, ibin) and activity(je, ibin)
+!       xt          calculate_xt(ibin, jliquid)
+!       log_gamz    the binary MTEM log10 gamma of A in E at ah2o, per level
+!       keq_ll      Keq_ll(1:3), per level
+!   and the parameter tables, filled once: a_zsr, b_zsr, aw_min, b_mtem,
+!   kappa_nonelectro, mw_aer_mac, dens_aer_mac.
+      integer, parameter :: esm_maxel = 22, esm_maxaer = 112
+      integer, save :: esm_th_ncall(esm_maxbin, esm_maxk)
+      integer, save :: esm_th_slot = 0
+      real(kind=8), save :: esm_th_elec(esm_maxel, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_aerl(esm_maxaer, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_aert(esm_maxaer, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_ah2o_a(esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_water(esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_xt(esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_gam_ratio(esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_mc(4, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_ma(5, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_gam(esm_maxel, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_act(esm_maxel, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_th_ah2o(esm_maxk), esm_th_tk(esm_maxk)
+      real(kind=8), save :: esm_th_keq_ll(3, esm_maxk)
+      real(kind=8), save :: esm_th_log_gamz(esm_maxel, esm_maxel, esm_maxk)
+      real(kind=8), save :: esm_th_a_zsr(6, esm_maxel), esm_th_b_zsr(esm_maxel)
+      real(kind=8), save :: esm_th_aw_min(esm_maxel)
+      real(kind=8), save :: esm_th_b_mtem(6, esm_maxel, esm_maxel)
+      real(kind=8), save :: esm_th_kappa(esm_maxaer), esm_th_mw_aer(esm_maxaer)
+      real(kind=8), save :: esm_th_dens_aer(esm_maxaer)
+      integer, save :: esm_th_iaer(7) = 0   ! iso4_a ino3_a icl_a inh4_a imsa_a ina_a ica_a
+
 !   shapes actually used, so a consumer does not have to guess
       integer, save :: esm_nbin = 0, esm_ncomp_coag = 0, esm_ngas = 0
 !   MOSAIC's gas indices, dumped with the rates
@@ -145,6 +186,13 @@
       esm_coag_denswet = 0.0
       esm_coag_tk = 0.0
       esm_coag_patm = 0.0
+      esm_th_ncall = 0; esm_th_slot = 0
+      esm_th_elec = 0.0d0; esm_th_aerl = 0.0d0; esm_th_aert = 0.0d0
+      esm_th_ah2o_a = 0.0d0; esm_th_water = 0.0d0; esm_th_xt = 0.0d0
+      esm_th_gam_ratio = 0.0d0; esm_th_mc = 0.0d0; esm_th_ma = 0.0d0
+      esm_th_gam = 0.0d0; esm_th_act = 0.0d0
+      esm_th_ah2o = 0.0d0; esm_th_tk = 0.0d0; esm_th_keq_ll = 0.0d0
+      esm_th_log_gamz = 0.0d0
       end subroutine esm_rates_reset
 
       end module module_esm_mosaic_rates

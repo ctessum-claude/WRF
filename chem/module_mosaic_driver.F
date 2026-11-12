@@ -268,6 +268,8 @@
 
 !   EarthSciML instrumentation: column (its, jts) through each MOSAIC stage
 	logical :: esm_dumping, esm_col
+	integer :: esm_th_islot
+	character(len=3) :: esm_th_sfx
 	integer :: esm_l
 	character(len=16) :: esm_tag
 
@@ -611,6 +613,31 @@
 	    call esm_dump_var('coag_denswet', esm_coag_denswet(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('coag_t_k', esm_coag_tk(kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('coag_p_atm', esm_coag_patm(kclm_calcbgn:kclm_calcend))
+!   EarthSciML instrumentation: compute_activities in/out, first (_c1) and last
+!   (_c2) call per (bin, level), and the ZSR/MTEM tables (module_esm_mosaic_rates)
+	    call esm_dump_var('th_ncall', esm_th_ncall(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('th_ah2o', esm_th_ah2o(kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('th_t_k', esm_th_tk(kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('th_keq_ll', esm_th_keq_ll(:,kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('th_log_gamz', esm_th_log_gamz(:,:,kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('th_a_zsr', esm_th_a_zsr); call esm_dump_var('th_b_zsr', esm_th_b_zsr)
+	    call esm_dump_var('th_aw_min', esm_th_aw_min); call esm_dump_var('th_b_mtem', esm_th_b_mtem)
+	    call esm_dump_var('th_kappa', esm_th_kappa); call esm_dump_var('th_mw_aer', esm_th_mw_aer)
+	    call esm_dump_var('th_dens_aer', esm_th_dens_aer); call esm_dump_var('th_iaer', esm_th_iaer)
+	    do esm_th_islot = 1, 2
+	      write(esm_th_sfx,'(a,i1)') '_c', esm_th_islot
+	      call esm_dump_var('th_elec'//esm_th_sfx, esm_th_elec(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('th_aerl'//esm_th_sfx, esm_th_aerl(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('th_aert'//esm_th_sfx, esm_th_aert(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('th_ah2o_a'//esm_th_sfx, esm_th_ah2o_a(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('th_water'//esm_th_sfx, esm_th_water(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('th_xt'//esm_th_sfx, esm_th_xt(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('th_gam_ratio'//esm_th_sfx, esm_th_gam_ratio(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('th_mc'//esm_th_sfx, esm_th_mc(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('th_ma'//esm_th_sfx, esm_th_ma(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('th_gam'//esm_th_sfx, esm_th_gam(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('th_act'//esm_th_sfx, esm_th_act(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	    end do
 	    call esm_dump_var('moist_out', moist(it,kts:kte,jt,:)); call esm_dump_var('chem_out', chem(it,kts:kte,jt,:))
 	    call esm_dump_close()
 	end if
