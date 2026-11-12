@@ -210,6 +210,88 @@ sub("""!-----------------------------------------------------------
 !-----------------------------------------------------------
 ! next, let's check the deep convection""")
 
+# --------------------------- the deep departure-level scan inside cutypen
+# The deep phase re-runs the test-parcel ascent from up to (klev-2) - (klev/2+1) + 1
+# departure levels, RESETTING every parcel array at the top of each iteration, so
+# nothing of an unsuccessful (or overridden) departure survives to cutypen's exit.
+# Each iteration's parcel is therefore snapshotted into rank-3 arrays indexed by
+# departure (dp index 1 = departure level klev-2, the lowest) and published once
+# at the routine's exit, together with the per-departure verdicts and the
+# routine's own outputs.
+sub("""      real(kind=kind_phys),dimension(klon,klev):: zbuo,abuoy,plude""",
+"""      real(kind=kind_phys),dimension(klon,klev):: zbuo,abuoy,plude
+      real(kind=kind_phys),allocatable,dimension(:,:,:):: esm_dp_ptu,esm_dp_pqu,esm_dp_plu, &
+                     esm_dp_dh,esm_dp_dhen,esm_dp_kup,esm_dp_vptu,esm_dp_vten,esm_dp_zbuo,esm_dp_abuoy, &
+                     esm_dp_klab
+      real(kind=kind_phys),allocatable,dimension(:,:):: esm_dp_kcbot,esm_dp_kctop,esm_dp_lldcum, &
+                     esm_dp_tried,esm_dp_deep
+      integer:: esm_nd,esm_id""")
+sub("""      do levels=klevm1-1,klev/2+1,-1 ! loop starts""",
+"""      esm_nd = (klevm1-1) - (klev/2+1) + 1
+      if (esm_dump_inner) then
+        allocate(esm_dp_ptu(klon,klev,esm_nd),esm_dp_pqu(klon,klev,esm_nd),esm_dp_plu(klon,klev,esm_nd))
+        allocate(esm_dp_dh(klon,klev,esm_nd),esm_dp_dhen(klon,klev,esm_nd),esm_dp_kup(klon,klev,esm_nd))
+        allocate(esm_dp_vptu(klon,klev,esm_nd),esm_dp_vten(klon,klev,esm_nd),esm_dp_zbuo(klon,klev,esm_nd))
+        allocate(esm_dp_abuoy(klon,klev,esm_nd),esm_dp_klab(klon,klev,esm_nd))
+        allocate(esm_dp_kcbot(klon,esm_nd),esm_dp_kctop(klon,esm_nd),esm_dp_lldcum(klon,esm_nd))
+        allocate(esm_dp_tried(klon,esm_nd),esm_dp_deep(klon,esm_nd))
+        esm_dp_ptu=0.; esm_dp_pqu=0.; esm_dp_plu=0.; esm_dp_dh=0.; esm_dp_dhen=0.; esm_dp_kup=0.
+        esm_dp_vptu=0.; esm_dp_vten=0.; esm_dp_zbuo=0.; esm_dp_abuoy=0.; esm_dp_klab=0.
+        esm_dp_kcbot=0.; esm_dp_kctop=0.; esm_dp_lldcum=0.; esm_dp_tried=0.; esm_dp_deep=0.
+      endif
+      do levels=klevm1-1,klev/2+1,-1 ! loop starts""")
+sub("""           loflag(jl)   = (.not. deepflag(jl)) .and. (levels.ge.itoppacel(jl))
+        end do""",
+"""           loflag(jl)   = (.not. deepflag(jl)) .and. (levels.ge.itoppacel(jl))
+        end do
+        esm_id = (klevm1-1) - levels + 1
+        if (esm_dump_inner) then
+          do jl=1,klon
+            if (loflag(jl)) esm_dp_tried(jl,esm_id) = 1.
+          end do
+        endif""")
+sub("""      if(needreset) then""",
+"""      if (esm_dump_inner) then
+        esm_dp_ptu(:,:,esm_id)=ptu(1:klon,:); esm_dp_pqu(:,:,esm_id)=pqu(1:klon,:)
+        esm_dp_plu(:,:,esm_id)=plu(1:klon,:); esm_dp_dh(:,:,esm_id)=dh(1:klon,:)
+        esm_dp_dhen(:,:,esm_id)=dhen(1:klon,:); esm_dp_kup(:,:,esm_id)=kup(1:klon,:)
+        esm_dp_vptu(:,:,esm_id)=vptu(1:klon,:); esm_dp_vten(:,:,esm_id)=vten(1:klon,:)
+        esm_dp_zbuo(:,:,esm_id)=zbuo(1:klon,:); esm_dp_abuoy(:,:,esm_id)=abuoy(1:klon,:)
+        esm_dp_klab(:,:,esm_id)=real(klab(1:klon,:),kind_phys)
+        do jl=1,klon
+          esm_dp_kcbot(jl,esm_id)=kcbot(jl); esm_dp_kctop(jl,esm_id)=kctop(jl)
+          if (lldcum(jl)) esm_dp_lldcum(jl,esm_id)=1.
+          if (deepflag(jl)) esm_dp_deep(jl,esm_id)=1.
+        end do
+      endif
+
+      if(needreset) then""")
+sub("""      end do ! end all cycles""",
+"""      end do ! end all cycles
+
+      if (esm_dump_inner) then
+        call esm_dump_var('dp_ptu',esm_dp_ptu); call esm_dump_var('dp_pqu',esm_dp_pqu)
+        call esm_dump_var('dp_plu',esm_dp_plu); call esm_dump_var('dp_dh',esm_dp_dh)
+        call esm_dump_var('dp_dhen',esm_dp_dhen); call esm_dump_var('dp_kup',esm_dp_kup)
+        call esm_dump_var('dp_vptu',esm_dp_vptu); call esm_dump_var('dp_vten',esm_dp_vten)
+        call esm_dump_var('dp_zbuo',esm_dp_zbuo); call esm_dump_var('dp_abuoy',esm_dp_abuoy)
+        call esm_dump_var('dp_klab',esm_dp_klab)
+        call esm_dump_var('dp_kcbot',esm_dp_kcbot); call esm_dump_var('dp_kctop',esm_dp_kctop)
+        call esm_dump_var('dp_lldcum',esm_dp_lldcum); call esm_dump_var('dp_tried',esm_dp_tried)
+        call esm_dump_var('dp_deep',esm_dp_deep); call esm_dump_var('dp_itoppacel',itoppacel)
+        call esm_dump_var('dp_pqsen',pqsen); call esm_dump_var('dp_pgeoh',pgeoh)
+        call esm_dump_var('dp_paph',paph); call esm_dump_var('dp_ptenh',ptenh)
+        call esm_dump_var('dp_pqenh',pqenh); call esm_dump_var('dp_pgeo',pgeo)
+        call esm_dump_var('ty_ktype',ktype); call esm_dump_var('ty_ldcum',ldcum)
+        call esm_dump_var('ty_cubot',cubot); call esm_dump_var('ty_cutop',cutop)
+        call esm_dump_var('ty_kdpl',kdpl); call esm_dump_var('ty_wbase',wbase)
+        call esm_dump_var('ty_cutu',cutu); call esm_dump_var('ty_cuqu',cuqu)
+        call esm_dump_var('ty_culu',culu); call esm_dump_var('ty_culab',culab)
+        deallocate(esm_dp_ptu,esm_dp_pqu,esm_dp_plu,esm_dp_dh,esm_dp_dhen,esm_dp_kup,esm_dp_vptu, &
+                   esm_dp_vten,esm_dp_zbuo,esm_dp_abuoy,esm_dp_klab,esm_dp_kcbot,esm_dp_kctop, &
+                   esm_dp_lldcum,esm_dp_tried,esm_dp_deep)
+      endif""")
+
 # ------------------- inside cuflxn: the state the precipitation sweeps start from
 # Blocks 1 and 1a of cuflxn zero pdmfup/pdmfdp outside the cloud and below the
 # downdraught, so the sweeps do NOT see the values cumastrn passed in.
