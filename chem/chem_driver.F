@@ -42,6 +42,7 @@
   USE module_input_tracer, only: set_tracer
   USE module_wetscav_driver, only: wetscav_driver
   USE module_wetdep_ls, only:wetdep_ls
+  USE module_esm_dump, only: esm_dump_want, esm_dump_open, esm_dump_var, esm_dump_close
   USE module_uoc_dustwd ! Claudia, 3 April 2014  [mklose 03082015]
   USE module_vash_settling, only: wetdep_ls_volc        ! A. Ukhov (KAUST) 24 Oct 2024
   USE module_input_chem_data, only: last_chem_time, &
@@ -237,6 +238,9 @@
                                                              ,t_phy,dz8w,t8w,p8w                  &
                                                              ,rho,rri,z_at_w,vvel,zmid,rh
       REAL,DIMENSION(grid%sm31:grid%em31,grid%sm33:grid%em33) :: pbl_h
+      ! EqWeFiC: in/out column of wetdep_ls (ESM_DUMP=wetdep_ls)
+      LOGICAL :: esm_wl_want
+      REAL, ALLOCATABLE :: esm_wl_in(:,:)
       REAL,DIMENSION(grid%sm31:grid%em31,grid%sm33:grid%em33, 5) :: seasin,dustin
       REAL,DIMENSION(grid%sm32:grid%em32-1) :: QL,TL
       REAL,DIMENSION(grid%sm31:grid%em31,grid%sm33:grid%em33) :: REXNSFC,FACTRS                &
@@ -1695,11 +1699,33 @@ end if !Chemistry time step check
                 ims,ime, jms,jme, kms,kme,                               &
                 its,ite, jts,jte, kts,kte                                )
             else
+              ! EqWeFiC: dump the (its,jts) column around wetdep_ls; one call per model step
+              esm_wl_want = esm_dump_want('wetdep_ls')
+              if (esm_wl_want) then
+                allocate(esm_wl_in(kts:kte,num_chem))
+                esm_wl_in = chem(its,kts:kte,jts,1:num_chem)
+              endif
               call wetdep_ls(grid%dt,chem,grid%rainncv,moist,rho,num_moist, &
                 num_chem,numgas,dz8w,vvel,grid%chem_opt,                 &
                 ids,ide, jds,jde, kds,kde,                               &
                 ims,ime, jms,jme, kms,kme,                               &
                 its,ite, jts,jte, kts,kte                                )
+              if (esm_wl_want) then
+                call esm_dump_open('wetdep_ls')
+                call esm_dump_var('kts', kts); call esm_dump_var('kte', kte)
+                call esm_dump_var('num_chem', num_chem); call esm_dump_var('numgas', numgas)
+                call esm_dump_var('chem_opt', grid%chem_opt); call esm_dump_var('ktau', ktau)
+                call esm_dump_var('dt', grid%dt)
+                call esm_dump_var('rain', grid%rainncv(its,jts))
+                call esm_dump_var('qc', moist(its,kts:kte,jts,p_qc))
+                call esm_dump_var('rho', rho(its,kts:kte,jts))
+                call esm_dump_var('dz8w', dz8w(its,kts:kte,jts))
+                call esm_dump_var('vvel', vvel(its,kts:kte,jts))
+                call esm_dump_var('chem_in', esm_wl_in)
+                call esm_dump_var('chem_out', chem(its,kts:kte,jts,1:num_chem))
+                call esm_dump_close()
+                deallocate(esm_wl_in)
+              endif
             endif
          endif
 !

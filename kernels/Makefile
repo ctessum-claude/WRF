@@ -14,7 +14,7 @@ B = build
 P = ../phys
 M = ../phys/physics_mmm
 
-DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/ntiedtke_driver $(B)/noah_driver $(B)/cbmz_driver $(B)/mosaic_drydep_driver $(B)/mosaic_subproc_driver
+DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/ntiedtke_driver $(B)/noah_driver $(B)/cbmz_driver $(B)/mosaic_drydep_driver $(B)/mosaic_subproc_driver $(B)/wetdep_ls_driver
 all: $(DRIVERS)
 
 $(B):
@@ -138,6 +138,13 @@ $(B)/mosaic_drydep_driver: mosaic_drydep_driver.F90 $(COMMON) $(MOSDD)
 	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
 
 $(B)/mosaic_subproc_driver: mosaic_subproc_driver.F90 $(COMMON) $(MOSSUB)
+	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
+
+# WRF-Chem large-scale wet deposition (wetscav_onoff < 0): chem/module_wetdep_ls.F
+# compiled unchanged; it reads only species pointers from module_state_description.
+$(B)/module_wetdep_ls.o: $(C)/module_wetdep_ls.F $(B)/module_state_description.o
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
+$(B)/wetdep_ls_driver: wetdep_ls_driver.F90 $(COMMON) $(B)/module_state_description.o $(B)/module_wetdep_ls.o
 	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
 
 clean:
