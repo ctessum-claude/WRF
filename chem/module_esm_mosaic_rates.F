@@ -83,6 +83,34 @@
 !     esm_coag_tk       tkelvin (K) and esm_coag_patm patm (atm) of the cell
       real, save :: esm_coag_cbr(esm_maxbin, esm_maxbin, esm_maxk)
       real, save :: esm_coag_dpwet(esm_maxbin, esm_maxk)
+!
+!     The inputs and the bin-splitting tables of coagsolv's PAIR ASSEMBLY -- the
+!     step that turns the pair kernel cbr into each bin's own rate.  None of
+!     these is recoverable from what the driver already dumps:
+!       esm_coag_dpdry    dpdry_inp(i), cm.  volume(i) = (4pi/3)(dpdry/2)^3 is
+!                         what the splitting tables and the number production
+!                         are written in, and only dpwet was published before.
+!       esm_coag_distrib  the distribution coagsolv actually integrates,
+!                         distrib(i,1) = number (#/cm3-air) and
+!                         distrib(i,jaer>1) = the ncomp_coag volume/mass mixing
+!                         ratios.  Reconstructing it from rsub would mean
+!                         re-deriving mosaic_coag_1clm's number-conforming
+!                         clamp, which rewrites rsub BEFORE coagsolv sees it.
+!       esm_coag_fink     fink(i,j,k) DENSE: the volume fraction of an i+j
+!                         collision that lands in bin k.  coagsolv stores it
+!                         sparsely, indexed by a per-(i,k) counter jbins with
+!                         the partner bin in jbinik, so the dense array is the
+!                         only form a consumer can check its own transcription
+!                         of the splitting rule against.
+!       esm_coag_floss    floss(i,j), the fraction of bin i lost per i+j
+!                         collision.
+!       esm_coag_deltat   deltat = deltat_inp/nsubstep, the sub-step rrate is
+!                         scaled by.
+      real, save :: esm_coag_dpdry(esm_maxbin, esm_maxk)
+      real, save :: esm_coag_distrib(esm_maxbin, esm_maxcomp, esm_maxk)
+      real, save :: esm_coag_fink(esm_maxbin, esm_maxbin, esm_maxbin, esm_maxk)
+      real, save :: esm_coag_floss(esm_maxbin, esm_maxbin, esm_maxk)
+      real, save :: esm_coag_deltat = 0.0
       real, save :: esm_coag_denswet(esm_maxbin, esm_maxk)
       real, save :: esm_coag_tk(esm_maxk), esm_coag_patm(esm_maxk)
 
@@ -109,6 +137,11 @@
       esm_mtc_patm = 0.0
       esm_coag_cbr = 0.0
       esm_coag_dpwet = 0.0
+      esm_coag_dpdry = 0.0
+      esm_coag_distrib = 0.0
+      esm_coag_fink = 0.0
+      esm_coag_floss = 0.0
+      esm_coag_deltat = 0.0
       esm_coag_denswet = 0.0
       esm_coag_tk = 0.0
       esm_coag_patm = 0.0

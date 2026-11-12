@@ -776,6 +776,17 @@
        volwet( j)  = cpi * radwet(j) * radwet(j) * radwet(j)
  30   continue
 
+! EarthSciML instrumentation: the DRY diameters the splitting tables and the
+! number production are written in (volume(i) = (4pi/3)(dpdry(i)/2)^3), and the
+! sub-step the pair rates are scaled by.  Only dpwet was published before, and
+! the kernel is the only thing dpwet enters.
+      if (esm_rate_on) then
+        do j = 1, irad
+          esm_coag_dpdry(j,esm_rate_k) = dpdry_inp(j)
+        end do
+        esm_coag_deltat = deltat
+      end if
+
 !
 ! *********************************************************************
 ! *              determine bins where coagulated terms go             *
@@ -858,6 +869,32 @@
 
  39     continue
  40   continue
+
+! EarthSciML instrumentation: the bin-splitting tables, DENSE.  coagsolv stores
+! fink sparsely -- fink(i,jb,k) with jb a per-(i,k) counter and the partner bin
+! in jbinik(i,k,jb) -- so the array a consumer must reproduce, the volume
+! fraction of an i+j collision that lands in bin k, is never materialised.
+! Scattering it out here is what lets a transcription of the splitting RULE be
+! checked against the table itself rather than only against the assembled rate,
+! where a wrong entry could hide behind a compensating one.
+      if (esm_rate_on) then
+        do i = 1, irad
+          do j = 1, irad
+            esm_coag_floss(i,j,esm_rate_k) = floss(i,j)
+            do k = 1, irad
+              esm_coag_fink(i,j,k,esm_rate_k) = 0.0
+            end do
+          end do
+        end do
+        do i = 1, irad
+          do k = 1, irad
+            do jb = 1, jbins(i,k)
+              esm_coag_fink(i,jbinik(i,k,jb),k,esm_rate_k) =   &
+                  fink(i,jb,k)
+            end do
+          end do
+        end do
+      end if
 
 !
 ! ***********************************************************************
@@ -998,6 +1035,12 @@
 ! cc2_new = (cc2 + prod)/(1 + aloss), so its increment over a finite step is
 ! not this rate times the step.
       if (esm_rate_on) then
+        do esm_jaer = 1, iaerty
+          do esm_k = 1, irad
+            esm_coag_distrib(esm_k,esm_jaer,esm_rate_k) =   &
+                distrib(esm_k,esm_jaer)
+          end do
+        end do
         do esm_jaer = 1, iaerty
           do esm_k = 1, irad
             esm_prod = 0.

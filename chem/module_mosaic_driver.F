@@ -601,6 +601,13 @@
 	    call esm_dump_var('mtc_p_atm', esm_mtc_patm(kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('coag_cbr', esm_coag_cbr(1:max(esm_nbin,1),1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('coag_dpwet', esm_coag_dpwet(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+!   EarthSciML instrumentation: coagsolv's pair-assembly inputs and its
+!   bin-splitting tables, dense (see module_esm_mosaic_rates.F)
+	    call esm_dump_var('coag_dpdry', esm_coag_dpdry(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('coag_distrib', esm_coag_distrib(1:max(esm_nbin,1),1:max(esm_ncomp_coag+1,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('coag_fink', esm_coag_fink(1:max(esm_nbin,1),1:max(esm_nbin,1),1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('coag_floss', esm_coag_floss(1:max(esm_nbin,1),1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('coag_deltat', esm_coag_deltat)
 	    call esm_dump_var('coag_denswet', esm_coag_denswet(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('coag_t_k', esm_coag_tk(kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('coag_p_atm', esm_coag_patm(kclm_calcbgn:kclm_calcend))

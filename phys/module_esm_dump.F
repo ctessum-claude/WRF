@@ -54,7 +54,7 @@ module module_esm_dump
 
   interface esm_dump_var
     module procedure dump_r8_0, dump_r8_1, dump_r8_2, dump_r8_3
-    module procedure dump_r4_0, dump_r4_1, dump_r4_2, dump_r4_3
+    module procedure dump_r4_0, dump_r4_1, dump_r4_2, dump_r4_3, dump_r4_4
     module procedure dump_i_0, dump_i_1, dump_i_2
     module procedure dump_l_0, dump_l_1
     module procedure dump_str
@@ -237,6 +237,17 @@ contains
     call write_r8(real(reshape(v, [size(v)]), real64))
     call footer()
   end subroutine dump_r4_3
+
+  ! Rank 4: needed by the dense bin-splitting tables of MOSAIC's coagulation
+  ! (fink(i,j,k) per column level), which have no rank-3 spelling that is not a
+  ! hand-flattened index the reader would have to undo.
+  subroutine dump_r4_4(name, v)
+    character(len=*), intent(in) :: name
+    real(real32), intent(in) :: v(:,:,:,:)
+    call header(name, 'real32', shape(v))
+    call write_r8(real(reshape(v, [size(v)]), real64))
+    call footer()
+  end subroutine dump_r4_4
 
   subroutine write_i(vals)
     integer, intent(in) :: vals(:)
