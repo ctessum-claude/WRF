@@ -43,6 +43,9 @@
   USE module_wetscav_driver, only: wetscav_driver
   USE module_wetdep_ls, only:wetdep_ls
   USE module_esm_dump, only: esm_dump_want, esm_dump_open, esm_dump_var, esm_dump_close
+  USE module_data_mosaic_asect, only: esm_ma_volumcen => volumcen_sect, esm_ma_nsize => nsize_aer, esm_ma_ai => ai_phase, &
+       esm_ma_so4 => lptr_so4_aer, esm_ma_no3 => lptr_no3_aer, esm_ma_oc => lptr_oc_aer, esm_ma_bc => lptr_bc_aer, &
+       esm_ma_oin => lptr_oin_aer, esm_ma_num => numptr_aer
   USE module_uoc_dustwd ! Claudia, 3 April 2014  [mklose 03082015]
   USE module_vash_settling, only: wetdep_ls_volc        ! A. Ukhov (KAUST) 24 Oct 2024
   USE module_input_chem_data, only: last_chem_time, &
@@ -241,6 +244,9 @@
       ! EqWeFiC: in/out column of wetdep_ls (ESM_DUMP=wetdep_ls)
       LOGICAL :: esm_wl_want
       REAL, ALLOCATABLE :: esm_wl_in(:,:)
+      ! EqWeFiC: in/out column of emissions_driver (ESM_DUMP=emissions)
+      LOGICAL :: esm_em_want
+      REAL, ALLOCATABLE :: esm_em_in(:,:)
       REAL,DIMENSION(grid%sm31:grid%em31,grid%sm33:grid%em33, 5) :: seasin,dustin
       REAL,DIMENSION(grid%sm32:grid%em32-1) :: QL,TL
       REAL,DIMENSION(grid%sm31:grid%em31,grid%sm33:grid%em33) :: REXNSFC,FACTRS                &
@@ -821,6 +827,12 @@
        .or. config_flags%tracer_opt > 0 .or. config_flags%bio_emiss_opt == MEGAN2_CLM ) then
       call wrf_debug(15,'calling emissions driver')
 
+      ! EqWeFiC: dump the (its,jts) column around emissions_driver; one call per model step
+      esm_em_want = esm_dump_want('emissions')
+      if (esm_em_want) then
+        allocate(esm_em_in(kts:kte,num_chem))
+        esm_em_in = chem(its,kts:kte,jts,1:num_chem)
+      endif
       call emissions_driver(grid%id,ktau,grid%dt,grid%DX,grid%DY,                          &
               adapt_step_flag, curr_secs,                                                  &
               grid%plumerisefire_frq,grid%stepfirepl,                                      &
@@ -895,6 +907,39 @@
               ids,ide, jds,jde, kds,kde,                                                   &
               ims,ime, jms,jme, kms,kme,                                                   &
               its,ite,jts,jte,kts,kte                                                      )
+      if (esm_em_want) then
+        call esm_dump_open('emissions')
+        call esm_dump_var('kts', kts); call esm_dump_var('kte', kte)
+        call esm_dump_var('num_chem', num_chem); call esm_dump_var('numgas', numgas)
+        call esm_dump_var('num_emis_ant', num_emis_ant); call esm_dump_var('ne_area', grid%ne_area)
+        call esm_dump_var('kemit', config_flags%kemit)
+        call esm_dump_var('chem_opt', config_flags%chem_opt); call esm_dump_var('emiss_opt', config_flags%emiss_opt)
+        call esm_dump_var('emiss_inpt_opt', config_flags%emiss_inpt_opt)
+        call esm_dump_var('bio_emiss_opt', config_flags%bio_emiss_opt)
+        call esm_dump_var('ktau', ktau); call esm_dump_var('dt', grid%dt)
+        call esm_dump_var('julday', ijulian); call esm_dump_var('gmt', grid%gmt)
+        call esm_dump_var('ivgtyp', grid%ivgtyp(its,jts))
+        call esm_dump_var('gsw', grid%gsw(its,jts)); call esm_dump_var('vegfra', grid%vegfra(its,jts))
+        call esm_dump_var('t_phy', t_phy(its,kts:kte,jts)); call esm_dump_var('p_phy', p_phy(its,kts:kte,jts))
+        call esm_dump_var('rho', rho(its,kts:kte,jts)); call esm_dump_var('alt', rri(its,kts:kte,jts))
+        call esm_dump_var('dz8w', dz8w(its,kts:kte,jts)); call esm_dump_var('z_at_w', z_at_w(its,kts:kte+1,jts))
+        call esm_dump_var('qv', moist(its,kts:kte,jts,p_qv)); call esm_dump_var('qc', moist(its,kts:kte,jts,p_qc))
+        call esm_dump_var('qr', moist(its,kts:kte,jts,p_qr))
+        call esm_dump_var('emis_ant', emis_ant(its,1:config_flags%kemit,jts,1:num_emis_ant))
+        call esm_dump_var('e_bio', grid%e_bio(its,jts,1:grid%ne_area))
+        call esm_dump_var('nsize_aer', esm_ma_nsize(1))
+        call esm_dump_var('volumcen_sect', esm_ma_volumcen(1:esm_ma_nsize(1),1))
+        call esm_dump_var('lptr_so4_aer', esm_ma_so4(1:esm_ma_nsize(1),1,esm_ma_ai))
+        call esm_dump_var('lptr_no3_aer', esm_ma_no3(1:esm_ma_nsize(1),1,esm_ma_ai))
+        call esm_dump_var('lptr_oc_aer', esm_ma_oc(1:esm_ma_nsize(1),1,esm_ma_ai))
+        call esm_dump_var('lptr_bc_aer', esm_ma_bc(1:esm_ma_nsize(1),1,esm_ma_ai))
+        call esm_dump_var('lptr_oin_aer', esm_ma_oin(1:esm_ma_nsize(1),1,esm_ma_ai))
+        call esm_dump_var('numptr_aer', esm_ma_num(1:esm_ma_nsize(1),1,esm_ma_ai))
+        call esm_dump_var('chem_in', esm_em_in)
+        call esm_dump_var('chem_out', chem(its,kts:kte,jts,1:num_chem))
+        call esm_dump_close()
+        deallocate(esm_em_in)
+      endif
               if( chm_is_mozart ) then
                  call mozcart_lbc_set( chem, num_chem, grid%id, &
                                        ims, ime, jms, jme, kms, kme,    &                  

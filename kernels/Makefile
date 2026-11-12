@@ -14,7 +14,7 @@ B = build
 P = ../phys
 M = ../phys/physics_mmm
 
-DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/ntiedtke_driver $(B)/noah_driver $(B)/cbmz_driver $(B)/mosaic_drydep_driver $(B)/mosaic_subproc_driver $(B)/wetdep_ls_driver
+DRIVERS = $(B)/ysu_driver $(B)/sfclayrev_driver $(B)/wsm6_driver $(B)/sw_driver $(B)/slab_driver $(B)/ntiedtke_driver $(B)/noah_driver $(B)/cbmz_driver $(B)/mosaic_drydep_driver $(B)/mosaic_subproc_driver $(B)/wetdep_ls_driver $(B)/emissions_driver
 all: $(DRIVERS)
 
 $(B):
@@ -146,6 +146,51 @@ $(B)/module_wetdep_ls.o: $(C)/module_wetdep_ls.F $(B)/module_state_description.o
 	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
 $(B)/wetdep_ls_driver: wetdep_ls_driver.F90 $(COMMON) $(B)/module_state_description.o $(B)/module_wetdep_ls.o
 	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
+
+# WRF-Chem emissions for chem_opt 170 (emiss_opt = 4, bio_emiss_opt = 1), the
+# routines emissions_driver.F calls, built standalone against a stub
+# module_configure (stub_module_configure.F90) carrying only the config fields
+# they read.  module_bioemi_simple compiles unchanged; module_cbmz_addemiss is
+# cut after cbmz_addemiss_anthro (lines 1-229), dropping cbmz_addemiss_bio, which
+# emissions_driver no longer calls and which needs module_aerosols_sorgam.
+# add_biogenics is extracted VERBATIM from module_emissions_anthropogenics.F
+# (lines 274-446) with its one unused use statement (module_aerosols_sorgam)
+# dropped.  module_mosaic_addemiss is the whole module with the dust_opt = 13
+# call to mosaic_dust_gocartemis (dead here, dust_opt = 0) and that routine
+# itself removed, because they need the GOCART dust modules.
+$(B)/module_configure.o: stub_module_configure.F90 | $(B)
+	$(FC) $(FFLAGS) -J$(B) -c $< -o $@
+$(B)/module_data_radm2.o: $(C)/module_data_radm2.F | $(B)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -c $< -o $@
+# (copied into $(B) first: ../chem holds the WRF build's own module_configure.mod,
+# which gfortran would find beside the source before the stub's)
+$(B)/%_copy.F: $(C)/%.F | $(B)
+	cp $< $@
+$(B)/module_bioemi_simple.o: $(B)/module_bioemi_simple_copy.F $(B)/module_configure.o $(B)/module_state_description.o $(B)/module_data_radm2.o
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
+$(B)/cbmz_addemiss_kernel.F: $(C)/module_cbmz_addemiss.F | $(B)
+	( sed -n '1,229p' $<; echo 'END MODULE module_cbmz_addemiss' ) > $@
+	grep -q 'END subroutine cbmz_addemiss_anthro' $@
+$(B)/module_cbmz_addemiss.o: $(B)/cbmz_addemiss_kernel.F $(B)/module_configure.o $(B)/module_state_description.o $(B)/module_data_radm2.o
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
+$(B)/add_biogenics_kernel.F90: $(C)/module_emissions_anthropogenics.F | $(B)
+	( echo 'module add_biogenics_kernel'; echo 'contains'; \
+	  sed -n '274,446p' $< | sed -e '/USE module_aerosols_sorgam/d'; \
+	  echo 'end module add_biogenics_kernel' ) > $@
+	grep -q 'END subroutine add_biogenics' $@
+$(B)/add_biogenics_kernel.o: $(B)/add_biogenics_kernel.F90 $(B)/module_configure.o $(B)/module_state_description.o $(B)/module_data_radm2.o
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $< -o $@
+$(B)/mosaic_addemiss_kernel.F: $(C)/module_mosaic_addemiss.F | $(B)
+	( sed -n '1,743p' $<; echo '         continue'; sed -n '752,2014p' $<; \
+	  sed -n '2220,$$p' $< ) > $@
+	grep -q 'call mosaic_dust_emiss' $@ && ! grep -q 'mosaic_dust_gocartemis' $@
+$(B)/module_mosaic_addemiss.o: $(B)/mosaic_addemiss_kernel.F $(B)/module_configure.o $(B)/module_state_description.o $(B)/module_data_mosaic_asect.o
+	$(FC) $(FFLAGS) $(PROMO) -ffixed-line-length-none -J$(B) -I$(B) -c $< -o $@
+EMIS = $(B)/stub_wrf_msg.o $(B)/module_configure.o $(B)/module_state_description.o $(B)/module_data_radm2.o \
+       $(B)/module_data_mosaic_asect.o $(B)/module_bioemi_simple.o $(B)/module_cbmz_addemiss.o \
+       $(B)/add_biogenics_kernel.o $(B)/module_mosaic_addemiss.o
+$(B)/emissions_driver: emissions_driver.F90 emissions_pointers.inc $(COMMON) $(EMIS)
+	$(FC) $(FFLAGS) $(PROMO) -I. -I$(B) -J$(B) emissions_driver.F90 $(COMMON) $(EMIS) -o $@
 
 clean:
 	rm -rf $(B)
