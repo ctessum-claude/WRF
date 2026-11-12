@@ -638,6 +638,26 @@
 	      call esm_dump_var('th_gam'//esm_th_sfx, esm_th_gam(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
 	      call esm_dump_var('th_act'//esm_th_sfx, esm_th_act(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
 	    end do
+!   EarthSciML instrumentation: aerosol_phase_state in/out, first (_c1) and last
+!   (_c2) call per (bin, level) (module_esm_mosaic_rates, esm_ps_*)
+	    call esm_dump_var('ps_ncall', esm_ps_ncall(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('ps_rh_pc', esm_ps_rh_pc(kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('ps_t_k', esm_ps_tk(kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('ps_sigma_water', esm_ps_sigma_water)
+	    call esm_dump_var('ps_partial_molar_vol', esm_ps_pmv)
+	    call esm_dump_var('ps_mdrh_t', esm_ps_mdrh_t)
+	    call esm_dump_var('ps_ptol_mol_astem', esm_ps_ptol)
+	    do esm_th_islot = 1, 2
+	      write(esm_th_sfx,'(a,i1)') '_c', esm_th_islot
+	      call esm_dump_var('ps_aert_in'//esm_th_sfx, esm_ps_aert_in(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('ps_elet_in'//esm_th_sfx, esm_ps_elet_in(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('ps_aers'//esm_th_sfx, esm_ps_aers(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('ps_aerl'//esm_th_sfx, esm_ps_aerl(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('ps_eles'//esm_th_sfx, esm_ps_eles(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('ps_elel'//esm_th_sfx, esm_ps_elel(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('ps_kel'//esm_th_sfx, esm_ps_kel(1:8,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	      call esm_dump_var('ps_sc'//esm_th_sfx, esm_ps_sc(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend,esm_th_islot))
+	    end do
 	    call esm_dump_var('moist_out', moist(it,kts:kte,jt,:)); call esm_dump_var('chem_out', chem(it,kts:kte,jt,:))
 	    call esm_dump_close()
 	end if

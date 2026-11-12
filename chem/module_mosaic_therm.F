@@ -2896,6 +2896,10 @@
       real(kind=8) kelvin_toler, term
       real(kind=8) aer_H
 
+!   EarthSciML instrumentation: entry state (esm_ps_*, module_esm_mosaic_rates)
+      if (esm_rate_on) call esm_ps_record_in(ibin)
+      esm_ps_path_now = 0
+      iter_kelvin = 0
 
       ah2o = rh_pc*0.01
       ah2o_a(ibin) = ah2o
@@ -2951,9 +2955,9 @@
 
       call mesa(ibin)
       if(jaerosolstate(ibin) .eq. all_solid)then
-        return
+        goto 9991
       endif
-      if (istat_mosaic_fe1 .lt. 0) return
+      if (istat_mosaic_fe1 .lt. 0) goto 9991
 
 ! new wet mass and wet volume
       mass_wet_a(ibin) = mass_dry_a(ibin) + water_a(ibin)*1.e-3		! g/cc(air)
@@ -2979,7 +2983,8 @@
         kel(iv,ibin) = 1. + term*(1. + 0.5*term*(1. + term/3.))
       enddo
 
-
+!   EarthSciML instrumentation: exit state; the all-solid and error exits jump here
+9991  if (esm_rate_on) call esm_ps_record_out(ibin, iter_kelvin)
       return
       end subroutine aerosol_phase_state
 
@@ -3079,6 +3084,7 @@
         jphase(ibin)    = jsolid
         jhyst_leg(ibin) = jhyst_lo
         call adjust_solid_aerosol(ibin)
+        esm_ps_path_now = 1   ! EarthSciML: below crh, all solid
         return
       endif
 
@@ -3098,6 +3104,7 @@
       end if
 
       if (jdum .eq. 1) then
+        esm_ps_path_now = 2   ! EarthSciML: upper hysteresis leg, full deliquescence
 
         call do_full_deliquescence(ibin)
 
@@ -3132,6 +3139,7 @@
           water_a(ibin) = aerosol_water(jtotal,ibin)
 
           if(water_a(ibin) .lt. 0.0)then    ! one last attempt to catch bad input
+            esm_ps_path_now = 3   ! EarthSciML: negative ZSR water, all solid
             jaerosolstate(ibin) = all_solid ! no soluble material present
             jphase(ibin)    = jsolid
             jhyst_leg(ibin) = jhyst_lo
@@ -3169,6 +3177,7 @@
       enddo
 
       if(jdum .eq. 0)then
+        esm_ps_path_now = 4   ! EarthSciML: no soluble salt above ptol, all solid
         jaerosolstate(ibin) = all_solid ! no significant soluble material present
         jphase(ibin) = jsolid
         call adjust_solid_aerosol(ibin)
@@ -3184,6 +3193,7 @@
       mdrh(ibin) = mdrh_t(j_index)
 
       if(ah2o_a(ibin)*100. .lt. mdrh(ibin)) then
+        esm_ps_path_now = 5   ! EarthSciML: below the mutual deliquescence rh, all solid
         jaerosolstate(ibin) = all_solid
         jphase(ibin) = jsolid
         jhyst_leg(ibin) = jhyst_lo
@@ -3194,6 +3204,7 @@
 
 ! step 4: none of the above means it must be sub-saturated or mixed-phase
 10    call do_full_deliquescence(ibin)
+      esm_ps_path_now = 6   ! EarthSciML: mesa_ptc (adds 10*outcome, 100*iterations)
       call mesa_ptc(ibin)	! determines jaerosolstate(ibin)
       if (istat_mosaic_fe1 .lt. 0) return
 
@@ -3614,6 +3625,7 @@
                                       idissolved)
 
       if(iconverge_mass .eq. myes)then
+        if (esm_ps_path_now .eq. 6) esm_ps_path_now = 6 + 10*1 + 100*itdum
         iter_mesa(ibin) = iter_mesa(ibin) + itdum
         niter_mesa = niter_mesa + itdum
         niter_mesa_max = max(niter_mesa_max, itdum)
@@ -3623,6 +3635,7 @@
         growth_factor(ibin) = 1.0
         return
       elseif(iconverge_flux .eq. myes)then
+        if (esm_ps_path_now .eq. 6) esm_ps_path_now = 6 + 10*2 + 100*itdum
         iter_mesa(ibin) = iter_mesa(ibin)+ itdum
         niter_mesa = niter_mesa + itdum
         niter_mesa_max = max(niter_mesa_max, itdum)
@@ -3741,6 +3754,7 @@
 500   continue	! end time continuation loop
 !--------------------------------------------------------------------
       nmesa_fail = nmesa_fail + 1
+      if (esm_ps_path_now .eq. 6) esm_ps_path_now = 6 + 10*3 + 100*itdum
       iter_mesa(ibin) = iter_mesa(ibin) + itdum
       niter_mesa = niter_mesa + itdum
       jaerosolstate(ibin) = mixed
@@ -9649,6 +9663,73 @@
         esm_th_act(je,ibin,k,esm_th_slot) = activity(je,ibin)
       enddo
       end subroutine esm_th_record_out
+
+!   EarthSciML instrumentation for aerosol_phase_state (esm_ps_*, see
+!   module_esm_mosaic_rates).
+      subroutine esm_ps_record_in(ibin)
+      integer ibin, k, je, ja, s
+      k = esm_rate_k
+      if (k .lt. 1 .or. k .gt. esm_maxk) return
+      esm_ps_ncall(ibin,k) = esm_ps_ncall(ibin,k) + 1
+      esm_ps_slot = min(esm_ps_ncall(ibin,k), 2)
+      s = esm_ps_slot
+      esm_ps_rh_pc(k) = rh_pc
+      esm_ps_tk(k) = t_k
+      do ja = 1, min(naer, esm_maxaer)
+        esm_ps_aert_in(ja,ibin,k,s) = aer(ja,jtotal,ibin)
+      enddo
+      do je = 1, min(nelectrolyte, esm_maxel23)
+        esm_ps_elet_in(je,ibin,k,s) = electrolyte(je,jtotal,ibin)
+      enddo
+      esm_ps_sc(:,ibin,k,s) = 0.0d0
+      esm_ps_sc(1,ibin,k,s) = water_a(ibin)
+      esm_ps_sc(2,ibin,k,s) = water_a_hyst(ibin)
+      esm_ps_sc(3,ibin,k,s) = water_a_up(ibin)
+      esm_ps_sc(4,ibin,k,s) = num_a(ibin)
+      esm_ps_sc(5,ibin,k,s) = jhyst_leg(ibin)
+      esm_ps_sc(23,ibin,k,s) = rh_pc
+      esm_ps_sigma_water = sigma_water
+      do ja = 1, min(ngas_volatile+ngas_het, esm_ps_maxgas)
+        esm_ps_pmv(ja) = partial_molar_vol(ja)
+      enddo
+      esm_ps_mdrh_t(1:63) = mdrh_t(1:63)
+      esm_ps_ptol = ptol_mol_astem
+      end subroutine esm_ps_record_in
+
+      subroutine esm_ps_record_out(ibin, niter)
+      integer ibin, niter, k, je, ja, s
+      k = esm_rate_k
+      s = esm_ps_slot
+      if (k .lt. 1 .or. k .gt. esm_maxk .or. s .lt. 1) return
+      do ja = 1, min(naer, esm_maxaer)
+        esm_ps_aers(ja,ibin,k,s) = aer(ja,jsolid,ibin)
+        esm_ps_aerl(ja,ibin,k,s) = aer(ja,jliquid,ibin)
+      enddo
+      do je = 1, min(nelectrolyte, esm_maxel23)
+        esm_ps_eles(je,ibin,k,s) = electrolyte(je,jsolid,ibin)
+        esm_ps_elel(je,ibin,k,s) = electrolyte(je,jliquid,ibin)
+      enddo
+      do ja = 1, min(ngas_volatile+ngas_het, esm_ps_maxgas)
+        esm_ps_kel(ja,ibin,k,s) = kel(ja,ibin)
+      enddo
+      esm_ps_sc(6,ibin,k,s) = jaerosolstate(ibin)
+      esm_ps_sc(7,ibin,k,s) = jphase(ibin)
+      esm_ps_sc(8,ibin,k,s) = jhyst_leg(ibin)
+      esm_ps_sc(9,ibin,k,s) = esm_ps_path_now
+      esm_ps_sc(10,ibin,k,s) = niter
+      esm_ps_sc(11,ibin,k,s) = ah2o_a(ibin)
+      esm_ps_sc(12,ibin,k,s) = kelvin(ibin)
+      esm_ps_sc(13,ibin,k,s) = water_a(ibin)
+      esm_ps_sc(14,ibin,k,s) = water_a_up(ibin)
+      esm_ps_sc(15,ibin,k,s) = mass_dry_a(ibin)
+      esm_ps_sc(16,ibin,k,s) = vol_dry_a(ibin)
+      esm_ps_sc(17,ibin,k,s) = mass_wet_a(ibin)
+      esm_ps_sc(18,ibin,k,s) = vol_wet_a(ibin)
+      esm_ps_sc(19,ibin,k,s) = dpmv(ibin)
+      esm_ps_sc(20,ibin,k,s) = sigma_soln(ibin)
+      esm_ps_sc(21,ibin,k,s) = growth_factor(ibin)
+      esm_ps_sc(22,ibin,k,s) = mdrh(ibin)
+      end subroutine esm_ps_record_out
 
 
 

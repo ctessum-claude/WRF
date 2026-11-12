@@ -155,6 +155,42 @@
       real(kind=8), save :: esm_th_dens_aer(esm_maxaer)
       integer, save :: esm_th_iaer(7) = 0   ! iso4_a ino3_a icl_a inh4_a imsa_a ina_a ica_a
 
+
+!   MOSAIC PHASE STATE, aerosol_phase_state (module_mosaic_therm.F): the Kelvin
+!   iteration around MESA, at the FIRST and the LAST call per (bin, level) of a
+!   dumped step (slot 1 / slot 2), real(kind=8).  esm_ps_* names:
+!     entry:  rh_pc, t_k (per level), aert_in = aer(:,jtotal), elet_in =
+!             electrolyte(:,jtotal) (conform_electrolytes has run), water_in,
+!             hyst_in = water_a_hyst, up_in = water_a_up, num = num_a,
+!             jhyst_in = jhyst_leg
+!     exit:   state = jaerosolstate, phase = jphase, jhyst = jhyst_leg,
+!             path = which MESA branch decided the state (esm_ps_path_*),
+!             niter = Kelvin iterations, ah2o_a, kelvin, kel(iv), water,
+!             water_up, mass/vol dry/wet, dpmv, sigma, growth, mdrh,
+!             aers/aerl = aer(:,jsolid|jliquid), eles/elel likewise
+!   and once: sigma_water, partial_molar_vol, mdrh_t, ptol_mol_astem.
+      integer, parameter :: esm_maxel23 = 23, esm_ps_maxgas = 112
+      integer, save :: esm_ps_ncall(esm_maxbin, esm_maxk)
+      integer, save :: esm_ps_slot = 0, esm_ps_path_now = 0
+      real(kind=8), save :: esm_ps_rh_pc(esm_maxk), esm_ps_tk(esm_maxk)
+      real(kind=8), save :: esm_ps_aert_in(esm_maxaer, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_ps_elet_in(esm_maxel23, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_ps_aers(esm_maxaer, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_ps_aerl(esm_maxaer, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_ps_eles(esm_maxel23, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_ps_elel(esm_maxel23, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_ps_kel(esm_ps_maxgas, esm_maxbin, esm_maxk, 2)
+!     scalars per (bin, level, slot): 1 water_in 2 hyst_in 3 up_in 4 num
+!     5 jhyst_in 6 state 7 phase 8 jhyst 9 path 10 niter 11 ah2o_a 12 kelvin
+!     13 water 14 water_up 15 mass_dry 16 vol_dry 17 mass_wet 18 vol_wet
+!     19 dpmv 20 sigma 21 growth 22 mdrh 23 rh_pc
+      integer, parameter :: esm_ps_nsc = 23
+      real(kind=8), save :: esm_ps_sc(esm_ps_nsc, esm_maxbin, esm_maxk, 2)
+      real(kind=8), save :: esm_ps_sigma_water = 0.0d0
+      real(kind=8), save :: esm_ps_pmv(esm_ps_maxgas) = 0.0d0
+      real(kind=8), save :: esm_ps_mdrh_t(64) = 0.0d0
+      real(kind=8), save :: esm_ps_ptol = 0.0d0
+
 !   shapes actually used, so a consumer does not have to guess
       integer, save :: esm_nbin = 0, esm_ncomp_coag = 0, esm_ngas = 0
 !   MOSAIC's gas indices, dumped with the rates
@@ -193,6 +229,12 @@
       esm_th_gam = 0.0d0; esm_th_act = 0.0d0
       esm_th_ah2o = 0.0d0; esm_th_tk = 0.0d0; esm_th_keq_ll = 0.0d0
       esm_th_log_gamz = 0.0d0
+      esm_ps_ncall = 0; esm_ps_slot = 0; esm_ps_path_now = 0
+      esm_ps_rh_pc = 0.0d0; esm_ps_tk = 0.0d0
+      esm_ps_aert_in = 0.0d0; esm_ps_elet_in = 0.0d0
+      esm_ps_aers = 0.0d0; esm_ps_aerl = 0.0d0
+      esm_ps_eles = 0.0d0; esm_ps_elel = 0.0d0
+      esm_ps_kel = 0.0d0; esm_ps_sc = 0.0d0
       end subroutine esm_rates_reset
 
       end module module_esm_mosaic_rates
