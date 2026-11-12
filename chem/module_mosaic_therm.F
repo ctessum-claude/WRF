@@ -13,6 +13,7 @@
 
 
       use module_esm_mosaic_rates
+      use module_esm_mesa_tape
       use module_data_mosaic_therm
       use module_peg_util
 
@@ -3607,10 +3608,12 @@
       enddo
 
       nmesa_call = nmesa_call + 1
+      if (esm_mp_on) call esm_mp_entry(ibin)   ! EarthSciML MESA tape
 
 !----begin pseudo time continuation loop-------------------------------
 
       do 500 itdum = 1, nmax_mesa
+      if (esm_mp_on) call esm_mp_top(ibin, itdum)   ! EarthSciML MESA tape
 
 
 ! compute new salt fluxes
@@ -3623,6 +3626,8 @@
                                       iconverge_mass,   &
                                       iconverge_flux,   &
                                       idissolved)
+      if (esm_mp_on) call esm_mp_flux(ibin, itdum, iconverge_mass,   &
+                                      iconverge_flux, idissolved)   ! EarthSciML MESA tape
 
       if(iconverge_mass .eq. myes)then
         if (esm_ps_path_now .eq. 6) esm_ps_path_now = 6 + 10*1 + 100*itdum
@@ -3633,6 +3638,7 @@
         call adjust_solid_aerosol(ibin)
         jhyst_leg(ibin) = jhyst_lo
         growth_factor(ibin) = 1.0
+        if (esm_mp_on) call esm_mp_exit(ibin, itdum, 1)   ! EarthSciML MESA tape
         return
       elseif(iconverge_flux .eq. myes)then
         if (esm_ps_path_now .eq. 6) esm_ps_path_now = 6 + 10*2 + 100*itdum
@@ -3664,6 +3670,7 @@
           epercent(je,jp,ibin) = 100.*electrolyte(je,jp,ibin)/sum_dum
         enddo
 
+        if (esm_mp_on) call esm_mp_exit(ibin, itdum, 2)   ! EarthSciML MESA tape
         return
       endif
 
@@ -3749,6 +3756,7 @@
 
 !---------------------------------
 
+      if (esm_mp_on) call esm_mp_step(ibin, itdum)   ! EarthSciML MESA tape
 
 
 500   continue	! end time continuation loop
@@ -3763,6 +3771,7 @@
       vol_wet_a(ibin)  = vol_dry_a(ibin) + water_a(ibin)*1.e-3		! cc(aer)/cc(air) or m^3/m^3(air)
       growth_factor(ibin) = mass_wet_a(ibin)/mass_dry_a(ibin)		! mass growth factor
 
+      if (esm_mp_on) call esm_mp_exit(ibin, itdum, 3)   ! EarthSciML MESA tape
       return
       end subroutine mesa_ptc
 
@@ -3808,6 +3817,7 @@
       call mesa_estimate_eleliquid(ibin,xt)
 
       calcium = aer(ica_a,jliquid,ibin)
+      if (esm_mp_on) call esm_mp_therm(ibin)   ! EarthSciML MESA tape
 
 
 

@@ -255,7 +255,7 @@ module_mosaic_movesect.o: module_peg_util.o module_data_mosaic_asect.o module_da
 
 module_mosaic_gly.o: module_data_mosaic_therm.o
 
-module_mosaic_therm.o: module_esm_mosaic_rates.o module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_data_mosaic_therm.o module_mosaic_movesect.o module_mosaic_gly.o
+module_mosaic_therm.o: module_esm_mosaic_rates.o module_esm_mesa_tape.o module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_data_mosaic_therm.o module_mosaic_movesect.o module_mosaic_gly.o
 
 module_mosaic_newnuc.o: module_esm_mosaic_rates.o module_peg_util.o module_data_mosaic_asect.o module_data_mosaic_other.o module_mosaic_movesect.o
 
@@ -379,3 +379,4 @@ module_cam_mam_mo_sethet.o: ../phys/module_cam_support.o module_cam_mam_mo_chem_
 module_kpp_radm2_interface.o: ../phys/module_esm_dump.o
 
 module_esm_mosaic_rates.o:
+module_esm_mesa_tape.o: module_data_mosaic_therm.o

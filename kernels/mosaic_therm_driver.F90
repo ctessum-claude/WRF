@@ -21,6 +21,16 @@
 !           between conform calls (reaches compute_activities' a_c /= 0)
 !   mode 2: the model's own phase-state step: conform_electrolytes(jtotal),
 !           aerosol_phase_state (Kelvin iteration around MESA)
+!   mode 4: as mode 2, but the third field of the mode line is rh_pc itself,
+!           read as real(kind=8) (a column call replayed from the
+!           aerosol_phase_state capture, whose rh_pc is dumped, not relhum)
+!   mode 5: as mode 2, but conform_electrolytes is NOT called: after the aer
+!           list a second list "nel" + "je value" lines gives
+!           electrolyte(:, jtotal) as the column call had it (the column's
+!           ASTEM can move aer(:, jtotal) between its conform and the phase
+!           state call, so re-forming them is not exact)
+! An optional third argument names a MESA tape file: mesa_ptc then writes
+! every iteration through module_esm_mesa_tape (esm_mp_*; case = case index).
 ! relhum and t_k are read as default REAL (the model's relhumclm and rsub are
 ! real32) and rh_pc = 100.*relhum is formed in default REAL, as in mosaic().
 ! Each case is recorded through the model's own instrumentation hooks
@@ -32,14 +42,23 @@ program mosaic_therm_driver
   use module_data_mosaic_therm
   use module_esm_mosaic_rates
   use module_mosaic_therm
+  use module_esm_mesa_tape
   implicit none
-  character(len=1024) :: inpath, outpath
+  character(len=1024) :: inpath, outpath, tapepath, line
+  real(kind=8) :: rh8
   integer :: ncase, ic, mode, nnz, i, ia, jh, vbs(1), islot
   real :: tk4, rh4, patm4
   real(kind=8) :: numa, wa, wh, wu, v, xt
   character(len=3) :: sfx
 
   call get_command_argument(1, inpath); call get_command_argument(2, outpath)
+  tapepath = ''
+  if (command_argument_count() >= 3) call get_command_argument(3, tapepath)
+  if (len_trim(tapepath) > 0) then
+    esm_mp_unit = 77
+    open(esm_mp_unit, file=trim(tapepath), status='replace')
+    esm_mp_on = .true.
+  endif
   open(10, file=trim(inpath), status='old')
   read(10,*) ncase
   if (ncase > esm_maxk) stop 'too many cases'
@@ -49,13 +68,22 @@ program mosaic_therm_driver
   esm_nbin = 1
   call load_mosaic_parameters
   do ic = 1, ncase
-    read(10,*) mode, tk4, patm4, rh4, numa, wa, wh, wu, jh
+    read(10,'(a)') line
+    read(line,*) mode
+    if (mode == 4) then
+      read(line,*) mode, tk4, patm4, rh8, numa, wa, wh, wu, jh
+      rh4 = real(rh8*0.01d0)
+    else
+      read(line,*) mode, tk4, patm4, rh4, numa, wa, wh, wu, jh
+    endif
     read(10,*) nnz
     call initialize_mosaic_variables
     t_k = tk4
     p_atm = patm4
     rh_pc = 100.*rh4
+    if (mode == 4) rh_pc = rh8
     ah2o = rh4
+    esm_mp_case = ic; esm_mp_call = 0
     call update_thermodynamic_constants(vbs)
     num_a(1) = numa; water_a(1) = wa; water_a_hyst(1) = wh; water_a_up(1) = wu
     jhyst_leg(1) = jh
@@ -66,7 +94,15 @@ program mosaic_therm_driver
     jaerosolstate(1) = 0
     istat_mosaic_fe1 = 1
     esm_rate_on = .true.; esm_rate_k = ic
-    call conform_electrolytes(jtotal,1,xt)
+    if (mode == 5) then
+      read(10,*) nnz
+      do i = 1, nnz
+        read(10,*) ia, v
+        electrolyte(ia,jtotal,1) = v
+      enddo
+    else
+      call conform_electrolytes(jtotal,1,xt)
+    endif
     if (mode == 3) then
       read(10,*) nnz
       do i = 1, nnz
@@ -87,6 +123,7 @@ program mosaic_therm_driver
     esm_rate_on = .false.
   enddo
   close(10)
+  if (esm_mp_on) close(esm_mp_unit)
 
   call esm_dump_open_file('mosaic_therm', trim(outpath))
   call esm_dump_var('ncase', ncase)
