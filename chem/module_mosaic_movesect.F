@@ -12,6 +12,7 @@
 	use module_data_mosaic_asect
 	use module_data_mosaic_other
 	use module_peg_util
+	use module_esm_mosaic_rates, only: esm_rate_on, esm_rate_k, esm_ms_xfer, esm_maxbin
 
 
 !
@@ -945,6 +946,16 @@
 	    xferfracnum(2,n) = 0.0
 	end if
 
+!   EarthSciML instrumentation: the transfer this bin is assigned
+	if (esm_rate_on .and. (m .eq. 1) .and. (n .le. esm_maxbin)) then
+	    esm_ms_xfer(1,n,esm_rate_k) = iforce_movecenter(n)
+	    esm_ms_xfer(2,n,esm_rate_k) = nnewsave(1,n)
+	    esm_ms_xfer(3,n,esm_rate_k) = nnewsave(2,n)
+	    esm_ms_xfer(4,n,esm_rate_k) = xferfracvol(1,n)
+	    esm_ms_xfer(5,n,esm_rate_k) = xferfracvol(2,n)
+	    esm_ms_xfer(6,n,esm_rate_k) = xferfracnum(1,n)
+	    esm_ms_xfer(7,n,esm_rate_k) = xferfracnum(2,n)
+	end if
 3900	continue
 
 	return

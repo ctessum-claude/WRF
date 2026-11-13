@@ -102,6 +102,9 @@ $(B)/module_mosaic_newnuc.o: $(C)/module_mosaic_newnuc.F $(B)/module_esm_mosaic_
 $(B)/module_mosaic_coag.o: $(C)/module_mosaic_coag.F $(B)/module_esm_mosaic_rates.o $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o $(B)/module_state_description.o
 	cp $< $(B)/$(notdir $<)
 	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $(B)/$(notdir $<) -o $@
+$(B)/module_mosaic_movesect.o: $(C)/module_mosaic_movesect.F $(B)/module_esm_mosaic_rates.o $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o
+	cp $< $(B)/$(notdir $<)
+	$(FC) $(FFLAGS) $(PROMO) -J$(B) -I$(B) -c $(B)/$(notdir $<) -o $@
 MOSSUB = $(B)/module_esm_mosaic_rates.o $(B)/stub_wrf_msg.o $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o \
          $(B)/module_peg_util.o $(B)/module_state_description.o \
          $(B)/module_mosaic_newnuc.o $(B)/module_mosaic_coag.o
@@ -152,6 +155,11 @@ $(B)/mosaic_drydep_driver: mosaic_drydep_driver.F90 $(COMMON) $(MOSDD)
 	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
 
 $(B)/mosaic_subproc_driver: mosaic_subproc_driver.F90 $(COMMON) $(MOSSUB)
+	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
+
+# move_sections alone, on the state recorded at its own entry (EqWeFiC
+# 2026-11-12); ESM_MS_DELTA scales the growth for the dt -> 0 limit.
+$(B)/movesect_driver: movesect_driver.F90 $(COMMON) $(B)/module_esm_mosaic_rates.o $(B)/stub_wrf_msg.o $(B)/module_data_mosaic_asect.o $(B)/module_data_mosaic_other.o $(B)/module_peg_util.o $(B)/module_mosaic_movesect.o
 	$(FC) $(FFLAGS) $(PROMO) -I$(B) -J$(B) $^ -o $@
 
 # coagsolv alone, on the inputs recorded at its entry (fork f311091e); see the

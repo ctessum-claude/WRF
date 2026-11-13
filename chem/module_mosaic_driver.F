@@ -613,6 +613,14 @@
 	    call esm_dump_var('coag_denswet', esm_coag_denswet(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('coag_t_k', esm_coag_tk(kclm_calcbgn:kclm_calcend))
 	    call esm_dump_var('coag_p_atm', esm_coag_patm(kclm_calcbgn:kclm_calcend))
+!   EarthSciML instrumentation: move_sections at its own entry and exit
+	    call esm_dump_var('ms_ltot', esm_ms_ltot)
+	    call esm_dump_var('ms_rsub_bef', esm_ms_rsub_bef(1:max(esm_ms_ltot,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('ms_rsub_aft', esm_ms_rsub_aft(1:max(esm_ms_ltot,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('ms_grow', esm_ms_grow(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('ms_diag', esm_ms_diag(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('ms_xfer', esm_ms_xfer(:,1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))
+	    call esm_dump_var('mw_water_aer', mw_water_aer)
 !   EarthSciML instrumentation: compute_activities in/out, first (_c1) and last
 !   (_c2) call per (bin, level), and the ZSR/MTEM tables (module_esm_mosaic_rates)
 	    call esm_dump_var('th_ncall', esm_th_ncall(1:max(esm_nbin,1),kclm_calcbgn:kclm_calcend))

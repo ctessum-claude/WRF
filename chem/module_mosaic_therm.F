@@ -160,7 +160,25 @@
           end if
 
           call specialoutaa( iclm, jclm, k, m, 'befor_movesect' )
+!         EarthSciML instrumentation: move_sections at its own entry and exit
+          if (esm_rate_on .and. m == 1 .and. ltot2 <= esm_maxl) then
+            esm_ms_ltot = ltot2
+            esm_ms_rsub_bef(1:ltot2,k) = rsub(1:ltot2,k,m)
+            esm_ms_grow(1,1:nsize_aer(1),k) = drymass_pregrow(1:nsize_aer(1),1)
+            esm_ms_grow(2,1:nsize_aer(1),k) = drydens_pregrow(1:nsize_aer(1),1)
+            esm_ms_grow(3,1:nsize_aer(1),k) = drymass_aftgrow(1:nsize_aer(1),1)
+            esm_ms_grow(4,1:nsize_aer(1),k) = drydens_aftgrow(1:nsize_aer(1),1)
+          end if
           call move_sections( 1, iclm, jclm, k, m)
+          if (esm_rate_on .and. m == 1 .and. ltot2 <= esm_maxl) then
+            esm_ms_rsub_aft(1:ltot2,k) = rsub(1:ltot2,k,m)
+            esm_ms_diag(1,1:nsize_aer(1),k) = adrydens_sub(1:nsize_aer(1),1,k,m)
+            esm_ms_diag(2,1:nsize_aer(1),k) = awetdens_sub(1:nsize_aer(1),1,k,m)
+            esm_ms_diag(3,1:nsize_aer(1),k) = admeandry_sub(1:nsize_aer(1),1,k,m)
+            esm_ms_diag(4,1:nsize_aer(1),k) = admeanwet_sub(1:nsize_aer(1),1,k,m)
+            esm_ms_diag(5,1:nsize_aer(1),k) = aqvoldry_sub(1:nsize_aer(1),1,k,m)
+            esm_ms_diag(6,1:nsize_aer(1),k) = aqmassdry_sub(1:nsize_aer(1),1,k,m)
+          end if
           call specialoutaa( iclm, jclm, k, m, 'after_movesect' )
           if ( do_ph .eq. 1 ) then
           ph_aer1(k) = mc(1,1)

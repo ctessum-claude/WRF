@@ -192,6 +192,28 @@
       real(kind=8), save :: esm_ps_ptol = 0.0d0
 
 !   shapes actually used, so a consumer does not have to guess
+
+!   section moving (move_sections, module_mosaic_movesect.F; msectional = 20,
+!   the linear-discrete / mass-number-advection algorithm), recorded around
+!   the call in aerchemistry (module_mosaic_therm.F) at the routine's OWN entry
+!   and exit, per level of the dumped column:
+!     esm_ms_rsub_bef / _aft  the whole rsub(1:ltot2) column vector just before
+!                             and just after move_sections (mol/mol-air for
+!                             aerosol species, particles/mol-air for number)
+!     esm_ms_grow(1:4,n)      drymass_pregrow (g/mol-air), drydens_pregrow
+!                             (g/cm3), drymass_aftgrow, drydens_aftgrow
+!     esm_ms_diag(1:6,n)      after the call: adrydens_sub, awetdens_sub
+!                             (g/cm3), admeandry_sub, admeanwet_sub (cm),
+!                             aqvoldry_sub (cm3/mol-air), aqmassdry_sub (g/mol-air)
+!     esm_ms_xfer(1:7,n)      from calc_masnumadvect: iforce_movecenter,
+!                             nnewsave(1:2), xferfracvol(1:2), xferfracnum(1:2)
+      integer, parameter :: esm_maxl = 400
+      integer, save :: esm_ms_ltot = 0
+      real, save :: esm_ms_rsub_bef(esm_maxl, esm_maxk)
+      real, save :: esm_ms_rsub_aft(esm_maxl, esm_maxk)
+      real, save :: esm_ms_grow(4, esm_maxbin, esm_maxk)
+      real, save :: esm_ms_diag(6, esm_maxbin, esm_maxk)
+      real, save :: esm_ms_xfer(7, esm_maxbin, esm_maxk)
       integer, save :: esm_nbin = 0, esm_ncomp_coag = 0, esm_ngas = 0
 !   MOSAIC's gas indices, dumped with the rates
       integer, save :: esm_ih2so4 = 0, esm_ihno3 = 0, esm_ihcl = 0, &
@@ -235,6 +257,8 @@
       esm_ps_aers = 0.0d0; esm_ps_aerl = 0.0d0
       esm_ps_eles = 0.0d0; esm_ps_elel = 0.0d0
       esm_ps_kel = 0.0d0; esm_ps_sc = 0.0d0
+      esm_ms_rsub_bef = 0.0; esm_ms_rsub_aft = 0.0
+      esm_ms_grow = 0.0; esm_ms_diag = 0.0; esm_ms_xfer = 0.0
       end subroutine esm_rates_reset
 
       end module module_esm_mosaic_rates
