@@ -10,7 +10,8 @@
 ! mass; the dry VOLUME is interpolated the same way and the dry density is
 ! their ratio.  delta = 1 is the in-model call (real32 cross-check); delta -> 0
 ! gives the instantaneous transfer rate  d(transfer)/d(delta) / dtchem,  which
-! is what the .esm operator is tested against.
+! is what the .esm operator is tested against.  ESM_MS_FREEZE=1 holds the rsub
+! rows at their pre-growth values (see below).
 ! Built real64 (-fdefault-real-8 promotes the WRF-native modules).
 program movesect_driver
   use esm_flat_input
@@ -22,6 +23,7 @@ program movesect_driver
   implicit none
   character(len=1024) :: inpath, outpath, dstr
   integer :: n, l, k, ll, nsize, ncomp, kbgn, kend, nk, stat, lms
+  logical :: freeze
   real :: delta, vpre, vaft, vd, md
   integer, allocatable :: mptr(:), nptr(:), wptr(:), hptr(:)
   real, allocatable :: r1(:), dens(:), mw(:)
@@ -33,6 +35,13 @@ program movesect_driver
   delta = 1.0
   call get_environment_variable('ESM_MS_DELTA', dstr, status=stat)
   if (stat == 0 .and. len_trim(dstr) > 0) read(dstr, *) delta
+  ! ESM_MS_FREEZE=1 keeps every rsub row at its PRE-growth value and scales
+  ! only the growth (dry mass and volume): the transfer is then m0 x(delta)
+  ! exactly, so its delta-derivative m0 x'(0) is free of the m(delta) x(delta)
+  ! cross term that dominates for a component that grows by orders of
+  ! magnitude in one step (e.g. nitrate at the first step).
+  call get_environment_variable('ESM_MS_FREEZE', dstr, status=stat)
+  freeze = (stat == 0 .and. trim(dstr) == '1')
 
   lms = flat_i0('ms_ltot'); ltot2 = flat_i0('ltot2')
   kbgn = flat_i0('kclm_calcbgn'); kend = flat_i0('kclm_calcend'); nk = kend - kbgn + 1
@@ -71,7 +80,11 @@ program movesect_driver
   do k = 1, nk
     rsub(:,kbgn+k-1,1) = 0.0
     do l = 1, lms
-      rsub(l,kbgn+k-1,1) = rin(l,k) + delta*(rbef(l,k) - rin(l,k))
+      if (freeze) then
+        rsub(l,kbgn+k-1,1) = rin(l,k)
+      else
+        rsub(l,kbgn+k-1,1) = rin(l,k) + delta*(rbef(l,k) - rin(l,k))
+      end if
     end do
     do n = 1, nsize
       drymass_pregrow(n,1) = grow(1,n,k); drydens_pregrow(n,1) = grow(2,n,k)
@@ -102,6 +115,7 @@ program movesect_driver
   call esm_dump_open_file('mosaic', trim(outpath))
   call esm_dump_var('real_bytes', storage_size(delta)/8)
   call esm_dump_var('delta', delta)
+  call esm_dump_var('freeze', merge(1, 0, freeze))
   call esm_dump_var('ms_rsub_bef_replay', o_bef)
   call esm_dump_var('ms_rsub_aft_replay', o_aft)
   call esm_dump_var('ms_grow_replay', o_grow)
