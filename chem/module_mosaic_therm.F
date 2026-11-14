@@ -3973,6 +3973,12 @@
 !---------------------------------------------------------
 ! initialize moles of ions depending on the sulfate domain
 
+! EarthSciML fix (EqWeFiC FORTRAN_BUGS B30): the sulfate-poor cat_net below
+! read nc(jc_h) before any assignment, i.e. whatever the stack slot held, so
+! the model's trajectory depended on the call history (an instrumentation
+! hook that only writes a file changed it).  Zero is the intent: the same
+! expression in ions_to_electrolytes has no H+ term.
+      nc(jc_h) = 0.0d0
       jp = jliquid
 
       if(icase.eq.1)then ! xt >= 2 : sulfate poor domain
