@@ -27,7 +27,8 @@ program mosaic_subproc_driver
   use module_mosaic_newnuc, only: mosaic_newnuc_1clm
   use module_mosaic_coag, only: mosaic_coag_1clm
   use module_esm_mosaic_rates, only: esm_rate_on, esm_coag_dpdry, esm_coag_dpwet, &
-       esm_coag_denswet, esm_coag_distrib, esm_coag_cbr
+       esm_coag_denswet, esm_coag_distrib, esm_coag_cbr, esm_rate_newnuc, &
+       esm_rate_coag_num, esm_rate_coag_vol, esm_nbin, esm_ncomp_coag
   implicit none
   character(len=1024) :: inpath, outpath, dtstr
   integer :: n, l, k, ll, nsize, ncomp, kbgn, kend, nk, stat, istat, ktau, ktauc
@@ -110,8 +111,17 @@ program mosaic_subproc_driver
   end do
 
   istat = 0
-  call mosaic_newnuc_1clm(istat, 1, 1, kbgn, kend, flat_i0('idiagbb_dum'), dtchem, dtchem, &
-       rsub0_buf, 1, ktau, ktauc, 1, 1, 1, 1, 1, nk)
+  ! ESM_SKIP_NEWNUC=1: coagulation runs at the nucleation ENTRY state (rsub_therm),
+  ! so both stages' rates are referenced to one state (EqWeFiC
+  ! couplings/mosaic_aerchemistry_column.esm); the nucleation increments are
+  ! then still recorded below from a separate run without the flag.
+  call get_environment_variable('ESM_SKIP_NEWNUC', dtstr, status=stat)
+  esm_rate_on = .true.
+  esm_rate_newnuc = 0.0; esm_rate_coag_num = 0.0; esm_rate_coag_vol = 0.0
+  if (.not. (stat == 0 .and. trim(dtstr) == '1')) then
+    call mosaic_newnuc_1clm(istat, 1, 1, kbgn, kend, flat_i0('idiagbb_dum'), dtchem, dtchem, &
+         rsub0_buf, 1, ktau, ktauc, 1, 1, 1, 1, 1, nk)
+  end if
   do k = 1, nk
     rsub_newnuc(:,k) = rsub(1:ltot2,kbgn+k-1,1)
   end do
@@ -136,6 +146,9 @@ program mosaic_subproc_driver
   call esm_dump_var('coag_denswet_replay', esm_coag_denswet(1:nsize,kbgn:kend))
   call esm_dump_var('coag_distrib_replay', esm_coag_distrib(1:nsize,1:ncomp+4,kbgn:kend))
   call esm_dump_var('coag_cbr_replay', esm_coag_cbr(1:nsize,1:nsize,kbgn:kend))
+  call esm_dump_var('rate_newnuc_replay', esm_rate_newnuc(:,kbgn:kend))
+  call esm_dump_var('rate_coag_num_replay', esm_rate_coag_num(1:max(esm_nbin,1),kbgn:kend))
+  call esm_dump_var('rate_coag_vol_replay', esm_rate_coag_vol(1:max(esm_nbin,1),1:max(esm_ncomp_coag,1),kbgn:kend))
   call esm_dump_close()
 
 contains
